@@ -3,8 +3,14 @@ import { createAuthApi, createHttpClient, type TokenStorageAdapter } from '@zest
 const ACCESS_KEY = 'zr_admin_access_token';
 const REFRESH_KEY = 'zr_admin_refresh_token';
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
+const defaultApiUrl =
+  typeof window !== 'undefined' &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1'
+    ? 'https://zestroute-api.vercel.app/api/v1'
+    : 'http://localhost:5000/api/v1';
+
+export const API_BASE_URL = import.meta.env.VITE_API_URL || defaultApiUrl;
 
 export const adminTokenStorage: TokenStorageAdapter = {
   getAccessToken: () => localStorage.getItem(ACCESS_KEY),

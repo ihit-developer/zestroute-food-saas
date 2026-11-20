@@ -26,9 +26,22 @@ export function createApp() {
       ? helmet
       : (helmet as unknown as { default: () => express.RequestHandler }).default;
   app.use(helmetFn());
+  const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
   app.use(
     cors({
-      origin: env.CORS_ORIGINS.split(',').map((o) => o.trim()),
+      origin: (origin, callback) => {
+        if (
+          !origin ||
+          allowedOrigins.includes(origin) ||
+          origin.endsWith('.vercel.app') ||
+          origin.startsWith('http://localhost:') ||
+          origin.startsWith('http://127.0.0.1:')
+        ) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      },
       credentials: true,
     })
   );

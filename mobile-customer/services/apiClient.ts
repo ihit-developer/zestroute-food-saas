@@ -4,8 +4,15 @@ import { createAuthApi, createHttpClient, type TokenStorageAdapter } from '@zest
 const ACCESS_KEY = 'zr_customer_access_token';
 const REFRESH_KEY = 'zr_customer_refresh_token';
 
+const isRemoteWeb =
+  typeof window !== 'undefined' &&
+  Boolean(window.location?.hostname) &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1';
+
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+  process.env.EXPO_PUBLIC_API_URL ||
+  (isRemoteWeb ? 'https://zestroute-api.vercel.app/api/v1' : 'http://localhost:5000/api/v1');
 
 export const tokenStorage: TokenStorageAdapter = {
   getAccessToken: () => AsyncStorage.getItem(ACCESS_KEY),
