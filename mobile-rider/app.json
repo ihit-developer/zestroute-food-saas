@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "ZestRoute Rider",
+    "slug": "zestroute-rider",
+    "version": "1.0.0",
+    "scheme": "zestroute-rider",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "plugins": ["expo-router"]
+  }
+}

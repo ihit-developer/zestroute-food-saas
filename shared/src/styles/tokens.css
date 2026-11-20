@@ -1,0 +1,69 @@
+/* Centralized Design System CSS Variables (Master Prompt Section 5.2 & 5.3) */
+:root {
+  --zr-primary: #F47B20;
+  --zr-secondary: #D95F16;
+  --zr-accent: #FFC857;
+  --zr-bg: #FFF9F2;
+  --zr-surface: #FFFFFF;
+  --zr-surface-elevated: #FFFDF9;
+  --zr-text: #292522;
+  --zr-text-secondary: #81776E;
+  --zr-text-on-primary: #FFFFFF;
+  --zr-border: #F0E7DE;
+
+  --zr-success: #269B68;
+  --zr-success-bg: #EAF7F0;
+  --zr-warning: #E5A13B;
+  --zr-warning-bg: #FDF5E6;
+  --zr-error: #D9534F;
+  --zr-error-bg: #FDECEC;
+  --zr-info: #5187A8;
+  --zr-info-bg: #ECF3F8;
+  --zr-primary-soft: #FFF0E3;
+
+  --zr-skeleton-base: #F2E9DF;
+  --zr-skeleton-highlight: #FAF4ED;
+  --zr-overlay: rgba(41, 37, 34, 0.45);
+
+  --zr-font-en: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --zr-font-ur: 'Noto Sans Arabic', 'Inter', sans-serif;
+  --zr-font-sans: var(--zr-font-en);
+
+  --zr-radius-xs: 6px;
+  --zr-radius-sm: 8px;
+  --zr-radius-md: 12px;
+  --zr-radius-lg: 16px;
+  --zr-radius-xl: 24px;
+  --zr-radius-full: 9999px;
+
+  --zr-shadow-sm: 0 2px 8px rgba(41, 37, 34, 0.06);
+  --zr-shadow-md: 0 6px 20px rgba(41, 37, 34, 0.08);
+  --zr-shadow-lg: 0 12px 32px rgba(41, 37, 34, 0.12);
+}
+
+[data-theme='dark'] {
+  --zr-bg: #171412;
+  --zr-surface: #221D1A;
+  --zr-surface-elevated: #2B2420;
+  --zr-text: #FAF5F0;
+  --zr-text-secondary: #B6ABA1;
+  --zr-border: #362E28;
+
+  --zr-success-bg: rgba(38, 155, 104, 0.16);
+  --zr-warning-bg: rgba(229, 161, 59, 0.16);
+  --zr-error-bg: rgba(217, 83, 79, 0.16);
+  --zr-info-bg: rgba(81, 135, 168, 0.16);
+  --zr-primary-soft: rgba(244, 123, 32, 0.16);
+
+  --zr-skeleton-base: #2A2420;
+  --zr-skeleton-highlight: #362F2A;
+  --zr-overlay: rgba(0, 0, 0, 0.65);
+
+  --zr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --zr-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --zr-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+[dir='rtl'] {
+  --zr-font-sans: var(--zr-font-ur);
+}

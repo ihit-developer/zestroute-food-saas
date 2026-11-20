@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "ZestRoute",
+    "slug": "zestroute-customer",
+    "version": "1.0.0",
+    "scheme": "zestroute",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "plugins": ["expo-router"]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "food-delivery-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-restaurant Food Ordering & Delivery Management Platform (Customer Mobile, Rider Mobile, Restaurant Web, Admin Web, Express/MongoDB Backend)",
+  "workspaces": [
+    "shared",
+    "backend",
+    "mobile-customer",
+    "mobile-rider",
+    "web-restaurant",
+    "web-admin"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "overrides": {
+    "ws": "^8.18.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n API,RESTAURANT,ADMIN -c yellow,green,cyan \"npm run dev:backend\" \"npm run dev:restaurant\" \"npm run dev:admin\"",
+    "dev:web": "npm run dev",
+    "dev:mobile": "npm --workspace=mobile-customer run dev",
+    "dev:all": "concurrently -n API,RESTAURANT,ADMIN,MOBILE -c yellow,green,cyan,magenta \"npm run dev:backend\" \"npm run dev:restaurant\" \"npm run dev:admin\" \"npm run dev:customer:web\"",
+    "dev:backend": "npm --workspace=backend run dev",
+    "dev:restaurant": "npm --workspace=web-restaurant run dev",
+    "dev:admin": "npm --workspace=web-admin run dev",
+    "dev:customer": "npm --workspace=mobile-customer run dev",
+    "dev:customer:web": "npm --workspace=mobile-customer run dev:web",
+    "dev:rider": "npm --workspace=mobile-rider run dev",
+    "dev:rider:web": "npm --workspace=mobile-rider run dev:web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}
