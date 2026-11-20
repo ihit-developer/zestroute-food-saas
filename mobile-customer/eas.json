@@ -9,7 +9,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://zestroute-api-git-main-ihit-developers-projects.vercel.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://zestroute-api.vercel.app/api/v1"
       }
     },
     "production": {
@@ -17,7 +17,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://zestroute-api-git-main-ihit-developers-projects.vercel.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://zestroute-api.vercel.app/api/v1"
       }
     }
   }
