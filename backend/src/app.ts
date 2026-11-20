@@ -21,7 +21,11 @@ import { requireRole } from './middleware/rbac.middleware.js';
 export function createApp() {
   const app = express();
 
-  app.use(helmet());
+  const helmetFn =
+    typeof helmet === 'function'
+      ? helmet
+      : (helmet as unknown as { default: () => express.RequestHandler }).default;
+  app.use(helmetFn());
   app.use(
     cors({
       origin: env.CORS_ORIGINS.split(',').map((o) => o.trim()),
