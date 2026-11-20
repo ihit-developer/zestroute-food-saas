@@ -1,9 +1,15 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { type Options } from 'express-rate-limit';
+import type { RequestHandler } from 'express';
 import { env } from '../config/env.js';
+
+const createRateLimiter: (options?: Partial<Options>) => RequestHandler =
+  typeof rateLimit === 'function'
+    ? rateLimit
+    : (rateLimit as unknown as { default: (options?: Partial<Options>) => RequestHandler }).default;
 
 const isDev = env.NODE_ENV !== 'production';
 
-export const globalRateLimiter = rateLimit({
+export const globalRateLimiter = createRateLimiter({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: isDev ? Math.max(env.RATE_LIMIT_MAX_REQUESTS, 5000) : env.RATE_LIMIT_MAX_REQUESTS,
   standardHeaders: true,
@@ -14,7 +20,7 @@ export const globalRateLimiter = rateLimit({
   },
 });
 
-export const authRateLimiter = rateLimit({
+export const authRateLimiter = createRateLimiter({
   windowMs: 60_000,
   max: isDev ? 120 : 15,
   standardHeaders: true,
