@@ -2,14 +2,22 @@
   "expo": {
     "name": "ZestRoute",
     "slug": "zestroute-customer",
+    "owner": "ihtiaws-team",
     "version": "1.0.0",
     "scheme": "zestroute",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F47B20"
+    },
     "platforms": ["ios", "android", "web"],
     "android": {
       "package": "com.zestroute.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F47B20"
       }
     },
@@ -18,7 +26,8 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     },
     "plugins": ["expo-router"]
   }
