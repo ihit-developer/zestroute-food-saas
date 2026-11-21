@@ -34,11 +34,19 @@ interface AdminPackage {
   description: string;
   monthlyPriceMinor: number;
   yearlyPriceMinor: number;
+  platformAccess?: 'web_only' | 'mobile_only' | 'both';
+  subscriberCount?: number;
   features: string[];
   isActive: boolean;
   trialEligible?: boolean;
   sortOrder: number;
 }
+
+const PLATFORM_LABELS: Record<'web_only' | 'mobile_only' | 'both', { label: string; tone: 'info' | 'warning' | 'success' }> = {
+  both: { label: 'Website + Mobile App', tone: 'success' },
+  web_only: { label: 'Website Only', tone: 'info' },
+  mobile_only: { label: 'Mobile App Only', tone: 'warning' },
+};
 
 interface AdminVendorSub {
   id: string;
@@ -106,6 +114,7 @@ export const SubscriptionsPage: React.FC = () => {
   const [pkgDesc, setPkgDesc] = useState('');
   const [pkgMonthlyPkr, setPkgMonthlyPkr] = useState('4900');
   const [pkgYearlyPkr, setPkgYearlyPkr] = useState('49000');
+  const [pkgPlatform, setPkgPlatform] = useState<'web_only' | 'mobile_only' | 'both'>('both');
   const [pkgFeatures, setPkgFeatures] = useState('');
   const [pkgOrder, setPkgOrder] = useState('1');
 
@@ -152,6 +161,7 @@ export const SubscriptionsPage: React.FC = () => {
     setPkgDesc('');
     setPkgMonthlyPkr('4900');
     setPkgYearlyPkr('49000');
+    setPkgPlatform('both');
     setPkgFeatures('Full Menu & Order Management\nCustomer Mobile App Listing\nReal-time Analytics');
     setPkgOrder(String(packages.length + 1));
     setPkgModalOpen(true);
@@ -163,6 +173,7 @@ export const SubscriptionsPage: React.FC = () => {
     setPkgDesc(pkg.description);
     setPkgMonthlyPkr(String(Math.round(pkg.monthlyPriceMinor / 100)));
     setPkgYearlyPkr(String(Math.round(pkg.yearlyPriceMinor / 100)));
+    setPkgPlatform(pkg.platformAccess ?? 'both');
     setPkgFeatures((pkg.features ?? []).join('\n'));
     setPkgOrder(String(pkg.sortOrder));
     setPkgModalOpen(true);
@@ -211,6 +222,7 @@ export const SubscriptionsPage: React.FC = () => {
       description: pkgDesc.trim(),
       monthlyPriceMinor: Math.max(0, Math.round(Number(pkgMonthlyPkr) * 100)),
       yearlyPriceMinor: Math.max(0, Math.round(Number(pkgYearlyPkr) * 100)),
+      platformAccess: pkgPlatform,
       features: pkgFeatures
         .split('\n')
         .map((s) => s.trim())
@@ -605,6 +617,21 @@ export const SubscriptionsPage: React.FC = () => {
                 ),
               },
               {
+                key: 'platformAccess',
+                header: 'Platform Scope',
+                render: (r) => {
+                  const meta = PLATFORM_LABELS[r.platformAccess ?? 'both'];
+                  return (
+                    <div>
+                      <StatusBadge label={meta.label} tone={meta.tone} />
+                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)', marginTop: 4 }}>
+                        {r.subscriberCount ?? 0} active {(r.subscriberCount ?? 0) === 1 ? 'restaurant' : 'restaurants'}
+                      </div>
+                    </div>
+                  );
+                },
+              },
+              {
                 key: 'monthlyPriceMinor',
                 header: 'Monthly',
                 render: (r) => <strong>{formatMoney(r.monthlyPriceMinor)}</strong>,
@@ -825,6 +852,16 @@ export const SubscriptionsPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <InputField label="Package Name *" value={pkgName} onChange={(e) => setPkgName(e.target.value)} placeholder="e.g. Standard" />
           <InputField label="Description" value={pkgDesc} onChange={(e) => setPkgDesc(e.target.value)} placeholder="Short tagline" />
+          <Dropdown
+            label="Platform Scope (Website vs Mobile App)"
+            value={pkgPlatform}
+            onChange={(v) => setPkgPlatform(v as 'web_only' | 'mobile_only' | 'both')}
+            options={[
+              { label: 'Website + Mobile App (Full SaaS Suite)', value: 'both' },
+              { label: 'Website Portal Only', value: 'web_only' },
+              { label: 'Mobile App Only (Customer + Vendor App)', value: 'mobile_only' },
+            ]}
+          />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <InputField label="Monthly Price (PKR)" type="number" value={pkgMonthlyPkr} onChange={(e) => setPkgMonthlyPkr(e.target.value)} />
             <InputField label="Yearly Price (PKR)" type="number" value={pkgYearlyPkr} onChange={(e) => setPkgYearlyPkr(e.target.value)} />

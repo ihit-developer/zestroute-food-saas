@@ -31,6 +31,7 @@ interface SubscriptionPackage {
   description: string;
   monthlyPriceMinor: number;
   yearlyPriceMinor: number;
+  platformAccess?: 'web_only' | 'mobile_only' | 'both';
   features: string[];
   isTrialEligible: boolean;
   sortOrder: number;
@@ -318,6 +319,24 @@ export const SubscriptionPage: React.FC = () => {
                   ) : isPopular ? (
                     <StatusBadge label="Most Popular" tone="info" />
                   ) : null}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <StatusBadge
+                    label={
+                      pkg.platformAccess === 'web_only'
+                        ? 'Includes: Website Portal Only'
+                        : pkg.platformAccess === 'mobile_only'
+                          ? 'Includes: Mobile App Only'
+                          : 'Includes: Website + Mobile App'
+                    }
+                    tone={
+                      pkg.platformAccess === 'web_only'
+                        ? 'info'
+                        : pkg.platformAccess === 'mobile_only'
+                          ? 'warning'
+                          : 'success'
+                    }
+                  />
                 </div>
                 <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--zr-text-secondary)', minHeight: 38 }}>
                   {pkg.description}

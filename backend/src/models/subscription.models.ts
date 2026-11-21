@@ -8,6 +8,11 @@ const subscriptionPackageSchema = new Schema(
     description: { type: String, default: '', trim: true },
     monthlyPriceMinor: { type: Number, required: true, min: 0 },
     yearlyPriceMinor: { type: Number, required: true, min: 0 },
+    platformAccess: {
+      type: String,
+      enum: ['web_only', 'mobile_only', 'both'],
+      default: 'both',
+    },
     features: [{ type: String, trim: true }],
     isActive: { type: Boolean, default: true },
     trialEligible: { type: Boolean, default: true },

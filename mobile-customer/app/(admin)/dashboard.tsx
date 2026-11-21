@@ -51,6 +51,8 @@ interface AdminPackage {
   description: string;
   monthlyPriceMinor: number;
   yearlyPriceMinor: number;
+  platformAccess?: 'web_only' | 'mobile_only' | 'both';
+  subscriberCount?: number;
   features: string[];
   isActive: boolean;
   sortOrder: number;
@@ -132,6 +134,7 @@ export default function SuperAdminMobileDashboard() {
   const [pkgDesc, setPkgDesc] = useState('');
   const [pkgMonthly, setPkgMonthly] = useState('4900');
   const [pkgYearly, setPkgYearly] = useState('49000');
+  const [pkgPlatform, setPkgPlatform] = useState<'web_only' | 'mobile_only' | 'both'>('both');
   const [pkgFeatures, setPkgFeatures] = useState('');
 
   // Config State
@@ -229,6 +232,7 @@ export default function SuperAdminMobileDashboard() {
       setPkgDesc(pkg.description);
       setPkgMonthly(String(Math.round(pkg.monthlyPriceMinor / 100)));
       setPkgYearly(String(Math.round(pkg.yearlyPriceMinor / 100)));
+      setPkgPlatform(pkg.platformAccess ?? 'both');
       setPkgFeatures((pkg.features ?? []).join('\n'));
     } else {
       setEditPkg(null);
@@ -236,6 +240,7 @@ export default function SuperAdminMobileDashboard() {
       setPkgDesc('');
       setPkgMonthly('4900');
       setPkgYearly('49000');
+      setPkgPlatform('both');
       setPkgFeatures('Live Order Management\nMenu & Pricing\nCustomer Mobile App');
     }
     setPkgModalOpen(true);
@@ -251,6 +256,7 @@ export default function SuperAdminMobileDashboard() {
       description: pkgDesc.trim(),
       monthlyPriceMinor: Math.max(0, Math.round(Number(pkgMonthly) * 100)),
       yearlyPriceMinor: Math.max(0, Math.round(Number(pkgYearly) * 100)),
+      platformAccess: pkgPlatform,
       features: pkgFeatures
         .split('\n')
         .map((f) => f.trim())
@@ -527,6 +533,27 @@ export default function SuperAdminMobileDashboard() {
                       <Text style={{ fontSize: 16, fontWeight: '900', color: colors.textPrimary }}>{pkg.name}</Text>
                       <StatusBadge label={pkg.isActive ? 'ACTIVE' : 'DISABLED'} tone={pkg.isActive ? 'success' : 'error'} />
                     </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <StatusBadge
+                        label={
+                          pkg.platformAccess === 'web_only'
+                            ? 'WEBSITE ONLY'
+                            : pkg.platformAccess === 'mobile_only'
+                              ? 'MOBILE APP ONLY'
+                              : 'WEBSITE + MOBILE APP'
+                        }
+                        tone={
+                          pkg.platformAccess === 'web_only'
+                            ? 'info'
+                            : pkg.platformAccess === 'mobile_only'
+                              ? 'warning'
+                              : 'success'
+                        }
+                      />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                        {pkg.subscriberCount ?? 0} active {(pkg.subscriberCount ?? 0) === 1 ? 'restaurant' : 'restaurants'}
+                      </Text>
+                    </View>
                     <Text style={{ fontSize: 12.5, color: colors.textSecondary }}>{pkg.description}</Text>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
                       Monthly: {formatMoney(pkg.monthlyPriceMinor)} · Yearly: {formatMoney(pkg.yearlyPriceMinor)}
@@ -801,6 +828,40 @@ export default function SuperAdminMobileDashboard() {
             <ScrollView contentContainerStyle={{ gap: 12, paddingVertical: 8 }} keyboardShouldPersistTaps="handled">
               <InputField label="Package Name *" value={pkgName} onChangeText={setPkgName} />
               <InputField label="Description" value={pkgDesc} onChangeText={setPkgDesc} />
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.textSecondary }}>
+                PLATFORM SCOPE (WEBSITE / MOBILE APP)
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {(
+                  [
+                    { key: 'both', label: 'Web + Mobile App' },
+                    { key: 'web_only', label: 'Website Only' },
+                    { key: 'mobile_only', label: 'Mobile App Only' },
+                  ] as const
+                ).map((opt) => (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => setPkgPlatform(opt.key)}
+                    style={[
+                      styles.pillBtn,
+                      {
+                        backgroundColor: pkgPlatform === opt.key ? '#7C3AED' : colors.background,
+                        borderColor: pkgPlatform === opt.key ? '#7C3AED' : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: pkgPlatform === opt.key ? '#FFFFFF' : colors.textPrimary,
+                      }}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <InputField label="Monthly (PKR)" keyboardType="numeric" value={pkgMonthly} onChangeText={setPkgMonthly} />

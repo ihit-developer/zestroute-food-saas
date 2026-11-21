@@ -21,9 +21,10 @@ export class SubscriptionService {
       {
         name: 'Basic',
         slug: 'basic',
-        description: 'Essential tools for single-branch restaurants getting started online.',
+        description: 'Essential tools for single-branch restaurants getting started on the Website.',
         monthlyPriceMinor: 490_000, // PKR 4,900
         yearlyPriceMinor: 4_900_000, // PKR 49,000 (2 months free)
+        platformAccess: 'web_only',
         features: [
           'Live Kitchen Order Management',
           'Menu & Categories Management',
@@ -38,9 +39,10 @@ export class SubscriptionService {
       {
         name: 'Standard',
         slug: 'standard',
-        description: 'Built for growing restaurants with staff, inventory, and promotions.',
+        description: 'Built for growing restaurants with both Website & Mobile App access.',
         monthlyPriceMinor: 890_000, // PKR 8,900
         yearlyPriceMinor: 8_900_000, // PKR 89,000
+        platformAccess: 'both',
         features: [
           'Everything in Basic',
           'Multi-Branch Management',
@@ -56,9 +58,10 @@ export class SubscriptionService {
       {
         name: 'Premium',
         slug: 'premium',
-        description: 'Complete multi-branch enterprise suite with priority rider dispatch & analytics.',
+        description: 'Complete multi-branch Website + Mobile App enterprise suite with priority dispatch.',
         monthlyPriceMinor: 1_490_000, // PKR 14,900
         yearlyPriceMinor: 14_900_000, // PKR 149,000
+        platformAccess: 'both',
         features: [
           'Everything in Standard',
           'Unlimited Branches & Staff Seats',
@@ -181,6 +184,7 @@ export class SubscriptionService {
     const pkg = sub.packageId as unknown as {
       _id?: unknown;
       name?: string;
+      platformAccess?: 'web_only' | 'mobile_only' | 'both';
       features?: string[];
     } | null;
 
@@ -192,6 +196,7 @@ export class SubscriptionService {
       billingCycle: sub.billingCycle,
       packageId: pkg?._id ? String(pkg._id) : null,
       packageName: pkg?.name ?? (sub.status === 'trial' ? 'Free Trial (Full Access)' : 'Standard'),
+      platformAccess: pkg?.platformAccess ?? 'both',
       features: pkg?.features ?? [],
       startsAt: sub.currentPeriodStart ? sub.currentPeriodStart.toISOString() : null,
       expiresAt: expiryDate.toISOString(),
@@ -265,6 +270,7 @@ export class SubscriptionService {
         description: p.description ?? '',
         monthlyPriceMinor: p.monthlyPriceMinor,
         yearlyPriceMinor: p.yearlyPriceMinor,
+        platformAccess: (p.platformAccess as 'web_only' | 'mobile_only' | 'both') ?? 'both',
         features: p.features ?? [],
         isActive: p.isActive,
         trialEligible: p.trialEligible,
@@ -362,7 +368,19 @@ export class SubscriptionService {
 
   static async listAllPackages() {
     await this.ensureDefaultPackages();
-    const list = await SubscriptionPackageModel.find().sort({ sortOrder: 1, createdAt: 1 }).lean();
+    const [list, subs] = await Promise.all([
+      SubscriptionPackageModel.find().sort({ sortOrder: 1, createdAt: 1 }).lean(),
+      VendorSubscriptionModel.find({ status: { $in: ['active', 'trial'] } })
+        .select('packageId')
+        .lean(),
+    ]);
+    const countMap = new Map<string, number>();
+    for (const s of subs) {
+      if (s.packageId) {
+        const key = String(s.packageId);
+        countMap.set(key, (countMap.get(key) ?? 0) + 1);
+      }
+    }
     return list.map((p) => ({
       id: String(p._id),
       name: p.name,
@@ -370,6 +388,8 @@ export class SubscriptionService {
       description: p.description ?? '',
       monthlyPriceMinor: p.monthlyPriceMinor,
       yearlyPriceMinor: p.yearlyPriceMinor,
+      platformAccess: (p.platformAccess as 'web_only' | 'mobile_only' | 'both') ?? 'both',
+      subscriberCount: countMap.get(String(p._id)) ?? 0,
       features: p.features ?? [],
       isActive: p.isActive,
       trialEligible: p.trialEligible,
@@ -382,6 +402,7 @@ export class SubscriptionService {
     description?: string;
     monthlyPriceMinor: number;
     yearlyPriceMinor: number;
+    platformAccess?: 'web_only' | 'mobile_only' | 'both';
     features?: string[];
     isActive?: boolean;
     trialEligible?: boolean;
@@ -397,6 +418,7 @@ export class SubscriptionService {
       description: input.description?.trim() ?? '',
       monthlyPriceMinor: Math.max(0, Math.round(input.monthlyPriceMinor)),
       yearlyPriceMinor: Math.max(0, Math.round(input.yearlyPriceMinor)),
+      platformAccess: input.platformAccess ?? 'both',
       features: (input.features ?? []).map((f) => f.trim()).filter(Boolean),
       isActive: input.isActive ?? true,
       trialEligible: input.trialEligible ?? true,
@@ -411,6 +433,7 @@ export class SubscriptionService {
       description: string;
       monthlyPriceMinor: number;
       yearlyPriceMinor: number;
+      platformAccess: 'web_only' | 'mobile_only' | 'both';
       features: string[];
       isActive: boolean;
       trialEligible: boolean;
@@ -425,6 +448,9 @@ export class SubscriptionService {
     }
     if (typeof input.yearlyPriceMinor === 'number') {
       patch.yearlyPriceMinor = Math.max(0, Math.round(input.yearlyPriceMinor));
+    }
+    if (input.platformAccess && ['web_only', 'mobile_only', 'both'].includes(input.platformAccess)) {
+      patch.platformAccess = input.platformAccess;
     }
     if (Array.isArray(input.features)) {
       patch.features = input.features.map((f) => f.trim()).filter(Boolean);

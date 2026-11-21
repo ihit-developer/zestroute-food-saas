@@ -98,6 +98,7 @@ interface SubscriptionPackage {
   description: string;
   monthlyPriceMinor: number;
   yearlyPriceMinor: number;
+  platformAccess?: 'web_only' | 'mobile_only' | 'both';
   features: string[];
 }
 
@@ -752,6 +753,24 @@ export default function VendorDashboardScreen() {
                           {pkg.name}
                         </Text>
                         {isPopular ? <StatusBadge label="MOST POPULAR" tone="info" /> : null}
+                      </View>
+                      <View style={{ alignSelf: 'flex-start' }}>
+                        <StatusBadge
+                          label={
+                            pkg.platformAccess === 'web_only'
+                              ? 'WEBSITE ONLY'
+                              : pkg.platformAccess === 'mobile_only'
+                                ? 'MOBILE APP ONLY'
+                                : 'WEBSITE + MOBILE APP'
+                          }
+                          tone={
+                            pkg.platformAccess === 'web_only'
+                              ? 'info'
+                              : pkg.platformAccess === 'mobile_only'
+                                ? 'warning'
+                                : 'success'
+                          }
+                        />
                       </View>
                       <Text style={{ fontSize: 12.5, color: colors.textSecondary }}>{pkg.description}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
