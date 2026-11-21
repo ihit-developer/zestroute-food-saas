@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Flame,
+  LogOut,
   MapPin,
   ShoppingCart,
   Sparkles,
@@ -30,7 +31,7 @@ import {
 } from '../../components/ui';
 import { ActiveRestaurantBar } from '../../components/ActiveRestaurantBar';
 import { useFavorites, useHomeFeed, useNotifications } from '../../hooks/useCustomerData';
-import { httpClient } from '../../services/apiClient';
+import { authApi, httpClient, tokenStorage } from '../../services/apiClient';
 import { useAppStore, type ActiveRestaurantSession } from '../../store/useAppStore';
 
 export default function HomeScreen() {
@@ -44,6 +45,7 @@ export default function HomeScreen() {
   const selectedAddress = useAppStore((s) => s.selectedAddress);
   const user = useAppStore((s) => s.user);
   const isAuthenticated = useAppStore((s) => s.isAuthenticated);
+  const setSession = useAppStore((s) => s.setSession);
   const activeRestaurant = useAppStore((s) => s.activeRestaurant);
   const switchActiveRestaurant = useAppStore((s) => s.switchActiveRestaurant);
   const addToCart = useAppStore((s) => s.addToCart);
@@ -98,6 +100,17 @@ export default function HomeScreen() {
     setPendingRestSwitch(null);
     showToast(`Switched kitchen to ${target.name}`, 'success');
     router.push(`/restaurant/${target.id}`);
+  };
+
+  const handleQuickLogout = async () => {
+    const refresh = await tokenStorage.getRefreshToken();
+    if (refresh) {
+      await authApi.logout(refresh).catch(() => {});
+    }
+    await tokenStorage.clearTokens();
+    setSession(null);
+    showToast('Signed out', 'info');
+    router.replace('/(auth)/welcome');
   };
 
   const handleQuickAdd = (food: FoodCardData) => {
@@ -196,6 +209,13 @@ export default function HomeScreen() {
               accessibilityLabel="Profile"
               onPress={() => router.push('/(tabs)/profile')}
             />
+            {isAuthenticated ? (
+              <IconButton
+                icon={<LogOut size={18} color={colors.error} />}
+                accessibilityLabel="Quick Sign Out"
+                onPress={() => void handleQuickLogout()}
+              />
+            ) : null}
           </View>
         </View>
 
