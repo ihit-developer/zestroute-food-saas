@@ -23,6 +23,7 @@ import {
 import { AppError } from '../middleware/error.middleware.js';
 import { emitOrderStatusChanged } from '../sockets/socketGateway.js';
 import { RiderService } from './rider.service.js';
+import { SubscriptionService } from './subscription.service.js';
 import { hashPassword } from '../utils/crypto.js';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -107,6 +108,8 @@ export class RestaurantService {
       );
     });
     await session.endSession();
+    // Automatically activate configurable Free Trial for the new restaurant vendor
+    await SubscriptionService.ensureTrialForRestaurant(restaurantId, ownerId);
     return RestaurantModel.findById(restaurantId).lean();
   }
 

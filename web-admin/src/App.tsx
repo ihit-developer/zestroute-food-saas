@@ -7,6 +7,7 @@ import { useAdminStore } from './store/useAdminStore';
 import { AdminShell } from './layouts/AdminShell';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import {
   CustomersPage,
   RestaurantApplicationsPage,
@@ -53,6 +54,7 @@ export const App: React.FC = () => {
             <Route path="/login" element={<AdminLoginPage />} />
             <Route element={<AdminShell />}>
               <Route path="/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/restaurants" element={<RestaurantsPage />} />
               <Route path="/restaurants/applications" element={<RestaurantApplicationsPage />} />

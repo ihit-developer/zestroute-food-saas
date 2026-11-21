@@ -7,6 +7,7 @@ export * from './delivery.models.js';
 export * from './marketing.models.js';
 export * from './customer.models.js';
 export * from './system.models.js';
+export * from './subscription.models.js';
 
 import {
   AddressModel,

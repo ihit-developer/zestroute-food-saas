@@ -7,6 +7,7 @@ import {
   Bike,
   ClipboardCheck,
   CreditCard,
+  Crown,
   FolderTree,
   Globe,
   Image,
@@ -44,6 +45,7 @@ export const AdminShell: React.FC = () => {
 
   const navItems: AdminNavItem[] = [
     { key: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+    { key: '/subscriptions', label: 'Subscriptions & Plans', icon: <Crown size={17} /> },
     { key: '/customers', label: 'Customers', icon: <Users size={17} /> },
     { key: '/restaurants', label: 'Restaurants', icon: <Store size={17} /> },
     { key: '/restaurants/applications', label: 'Restaurant Apps', icon: <ClipboardCheck size={17} /> },

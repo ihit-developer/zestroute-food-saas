@@ -14,6 +14,7 @@ import {
   updateSettingsSchema,
 } from '../validators/admin.validators.js';
 import { AdminService } from '../services/admin.service.js';
+import { SubscriptionService } from '../services/subscription.service.js';
 
 export const adminRouter = Router();
 adminRouter.use(authenticate, requireRole('super_admin'));
@@ -373,6 +374,134 @@ adminRouter.patch('/settings', validateBody(updateSettingsSchema), async (req, r
     await recordAuditLog({
       req,
       action: 'update_platform_settings',
+      resourceType: 'app_settings',
+      resourceId: 'platform_config',
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Multi-Vendor SaaS Subscriptions, Packages & Payment Verification ───
+
+adminRouter.get('/subscriptions/overview', async (_req, res, next) => {
+  try {
+    const data = await SubscriptionService.getAdminOverview();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/subscription-packages', async (_req, res, next) => {
+  try {
+    const data = await SubscriptionService.listAllPackages();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/subscription-packages', async (req, res, next) => {
+  try {
+    const data = await SubscriptionService.createPackage(req.body);
+    await recordAuditLog({
+      req,
+      action: 'create_subscription_package',
+      resourceType: 'subscription_package',
+      resourceId: String(data._id),
+      after: req.body,
+    });
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/subscription-packages/:id', async (req, res, next) => {
+  try {
+    const data = await SubscriptionService.updatePackage(String(req.params.id), req.body);
+    await recordAuditLog({
+      req,
+      action: 'update_subscription_package',
+      resourceType: 'subscription_package',
+      resourceId: String(req.params.id),
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/subscription-packages/:id', async (req, res, next) => {
+  try {
+    const data = await SubscriptionService.deletePackage(String(req.params.id));
+    await recordAuditLog({
+      req,
+      action: 'delete_subscription_package',
+      resourceType: 'subscription_package',
+      resourceId: String(req.params.id),
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/subscription-payments/:id/review', async (req, res, next) => {
+  try {
+    const decision = req.body?.decision === 'rejected' ? 'rejected' : 'approved';
+    const data = await SubscriptionService.reviewPayment(
+      String(req.params.id),
+      req.auth!.userId,
+      decision,
+      typeof req.body?.reason === 'string' ? req.body.reason : undefined
+    );
+    await recordAuditLog({
+      req,
+      action: `subscription_payment_${decision}`,
+      resourceType: 'subscription_payment',
+      resourceId: String(req.params.id),
+      after: { decision, reason: req.body?.reason },
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/vendor-subscriptions/:restaurantId', async (req, res, next) => {
+  try {
+    const data = await SubscriptionService.adminUpdateVendorSubscription(
+      String(req.params.restaurantId),
+      req.body
+    );
+    await recordAuditLog({
+      req,
+      action: 'admin_update_vendor_subscription',
+      resourceType: 'vendor_subscription',
+      resourceId: String(req.params.restaurantId),
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/subscription-config', async (req, res, next) => {
+  try {
+    const data = await SubscriptionService.updateTrialConfig({
+      defaultTrialDays: req.body?.defaultTrialDays !== undefined ? Number(req.body.defaultTrialDays) : undefined,
+      paymentInstructions:
+        typeof req.body?.paymentInstructions === 'string' ? req.body.paymentInstructions : undefined,
+    });
+    await recordAuditLog({
+      req,
+      action: 'update_subscription_config',
       resourceType: 'app_settings',
       resourceId: 'platform_config',
       after: req.body,

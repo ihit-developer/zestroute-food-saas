@@ -18,6 +18,7 @@ import { BranchesPage } from './pages/dashboard/BranchesPage';
 import { StaffPage } from './pages/dashboard/StaffPage';
 import { ReviewsPage } from './pages/dashboard/ReviewsPage';
 import { FinancePage } from './pages/dashboard/FinancePage';
+import { SubscriptionPage } from './pages/dashboard/SubscriptionPage';
 import { ProfilePage } from './pages/dashboard/ProfilePage';
 import { SettingsPage } from './pages/dashboard/SettingsPage';
 import { DesignSystemPreview } from './pages/DesignSystemPreview';
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/finance" element={<FinancePage />} />
+              <Route path="/subscription" element={<SubscriptionPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

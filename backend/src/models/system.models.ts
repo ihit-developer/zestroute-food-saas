@@ -14,6 +14,12 @@ const appSettingSchema = new Schema(
     refundPolicy: { type: String, default: 'Verified refunds credited to wallet or source method.' },
     festivalMode: { type: String, enum: ['none', 'ramadan', 'eid', 'festival'], default: 'none' },
     supportEmail: { type: String, default: 'support@zestroute.app' },
+    defaultTrialDays: { type: Number, default: 14, min: 1, max: 365 },
+    subscriptionPaymentInstructions: {
+      type: String,
+      default:
+        'JazzCash: 0300-1234567 | Easypaisa: 0345-1234567 | Bank IBAN: PK36DAST00001234567890 (Dastarkhwan Pvt Ltd)',
+    },
   },
   { timestamps: true, collection: 'app_settings' }
 );

@@ -4,6 +4,7 @@ import {
   RestaurantStaffModel,
   RestaurantStaffPermissionModel,
 } from '../models/index.js';
+import { SubscriptionService } from '../services/subscription.service.js';
 
 export type PlatformRole =
   | 'customer'
@@ -109,6 +110,37 @@ export function requireOwnership(resolveOwnerId: (req: Request) => Promise<strin
       return;
     }
 
+    next();
+  };
+}
+
+/** Enforces active Free Trial or Paid Subscription on restaurant operational endpoints */
+export function requireActiveSubscription() {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const roles = req.auth?.roles ?? [];
+    if (roles.includes('super_admin')) {
+      next();
+      return;
+    }
+    const restaurantId = req.params.restaurantId || req.body?.restaurantId || req.query?.restaurantId;
+    if (!restaurantId || typeof restaurantId !== 'string') {
+      next();
+      return;
+    }
+    const status = await SubscriptionService.evaluateRestaurantSubscription(restaurantId);
+    if (!status.isAccessAllowed) {
+      res.status(402).json({
+        success: false,
+        error: {
+          code: 'SUBSCRIPTION_EXPIRED',
+          message:
+            status.status === 'suspended'
+              ? 'Your restaurant subscription has been suspended by the platform administrator.'
+              : 'Your free trial or subscription has expired. Please renew a plan to continue managing your restaurant.',
+        },
+      });
+      return;
+    }
     next();
   };
 }

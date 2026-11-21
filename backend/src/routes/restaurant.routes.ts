@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { requireRestaurantAccess, requireRole } from '../middleware/rbac.middleware.js';
+import { requireActiveSubscription, requireRestaurantAccess, requireRole } from '../middleware/rbac.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import {
   applyRestaurantSchema,
@@ -13,6 +13,7 @@ import {
   updateStockSchema,
 } from '../validators/restaurant.validators.js';
 import { RestaurantService } from '../services/restaurant.service.js';
+import { SubscriptionService } from '../services/subscription.service.js';
 
 export const restaurantRouter = Router();
 restaurantRouter.use(authenticate);
@@ -41,8 +42,41 @@ restaurantRouter.post(
 );
 
 restaurantRouter.get(
+  '/:restaurantId/subscription',
+  requireRestaurantAccess(),
+  async (req, res, next) => {
+    try {
+      const data = await SubscriptionService.getVendorSubscriptionOverview(
+        String(req.params.restaurantId)
+      );
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+restaurantRouter.post(
+  '/:restaurantId/subscription/payments',
+  requireRestaurantAccess(),
+  async (req, res, next) => {
+    try {
+      const data = await SubscriptionService.submitVendorPayment(
+        String(req.params.restaurantId),
+        req.auth!.userId,
+        req.body
+      );
+      res.status(201).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+restaurantRouter.get(
   '/:restaurantId/dashboard',
   requireRestaurantAccess('reports'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.getDashboardMetrics(String(req.params.restaurantId));
@@ -56,6 +90,7 @@ restaurantRouter.get(
 restaurantRouter.get(
   '/:restaurantId/orders',
   requireRestaurantAccess('orders'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const statusTab = typeof req.query.status === 'string' ? req.query.status : undefined;
@@ -70,6 +105,7 @@ restaurantRouter.get(
 restaurantRouter.post(
   '/:restaurantId/orders',
   requireRestaurantAccess('orders'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.createManualOrder(
@@ -87,6 +123,7 @@ restaurantRouter.post(
 restaurantRouter.patch(
   '/:restaurantId/orders/:orderId',
   requireRestaurantAccess('orders'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.updateOrderDetails(
@@ -104,6 +141,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/orders/:orderId',
   requireRestaurantAccess('orders'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deleteOrder(
@@ -120,6 +158,7 @@ restaurantRouter.delete(
 restaurantRouter.patch(
   '/:restaurantId/orders/:orderId/status',
   requireRestaurantAccess('orders'),
+  requireActiveSubscription(),
   validateBody(updateOrderStatusSchema),
   async (req, res, next) => {
     try {
@@ -140,6 +179,7 @@ restaurantRouter.patch(
 restaurantRouter.get(
   '/:restaurantId/categories',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.listCategories(String(req.params.restaurantId));
@@ -153,6 +193,7 @@ restaurantRouter.get(
 restaurantRouter.post(
   '/:restaurantId/categories',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   validateBody(createRestaurantCategorySchema),
   async (req, res, next) => {
     try {
@@ -167,6 +208,7 @@ restaurantRouter.post(
 restaurantRouter.get(
   '/:restaurantId/foods',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.listFoodItems(String(req.params.restaurantId));
@@ -180,6 +222,7 @@ restaurantRouter.get(
 restaurantRouter.post(
   '/:restaurantId/foods',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   validateBody(createFoodItemSchema),
   async (req, res, next) => {
     try {
@@ -194,6 +237,7 @@ restaurantRouter.post(
 restaurantRouter.patch(
   '/:restaurantId/foods/:foodId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   validateBody(updateFoodItemSchema),
   async (req, res, next) => {
     try {
@@ -212,6 +256,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/foods/:foodId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deleteFoodItem(
@@ -228,6 +273,7 @@ restaurantRouter.delete(
 restaurantRouter.get(
   '/:restaurantId/inventory',
   requireRestaurantAccess('inventory'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.listInventory(String(req.params.restaurantId));
@@ -241,6 +287,7 @@ restaurantRouter.get(
 restaurantRouter.patch(
   '/:restaurantId/stock',
   requireRestaurantAccess('inventory'),
+  requireActiveSubscription(),
   validateBody(updateStockSchema),
   async (req, res, next) => {
     try {
@@ -319,6 +366,7 @@ restaurantRouter.delete(
 restaurantRouter.patch(
   '/:restaurantId/categories/:categoryId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.updateCategory(
@@ -336,6 +384,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/categories/:categoryId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deleteCategory(
@@ -352,6 +401,7 @@ restaurantRouter.delete(
 restaurantRouter.post(
   '/:restaurantId/inventory',
   requireRestaurantAccess('inventory'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.createIngredient(String(req.params.restaurantId), req.body);
@@ -365,6 +415,7 @@ restaurantRouter.post(
 restaurantRouter.patch(
   '/:restaurantId/inventory/:ingredientId',
   requireRestaurantAccess('inventory'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.updateIngredient(
@@ -382,6 +433,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/inventory/:ingredientId',
   requireRestaurantAccess('inventory'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deleteIngredient(
@@ -398,6 +450,7 @@ restaurantRouter.delete(
 restaurantRouter.get(
   '/:restaurantId/promotions',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.listPromotions(String(req.params.restaurantId));
@@ -411,6 +464,7 @@ restaurantRouter.get(
 restaurantRouter.post(
   '/:restaurantId/promotions',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.createPromotion(String(req.params.restaurantId), req.body);
@@ -424,6 +478,7 @@ restaurantRouter.post(
 restaurantRouter.patch(
   '/:restaurantId/promotions/:promoId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.updatePromotion(
@@ -441,6 +496,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/promotions/:promoId',
   requireRestaurantAccess('menu'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deletePromotion(
@@ -457,6 +513,7 @@ restaurantRouter.delete(
 restaurantRouter.get(
   '/:restaurantId/branches',
   requireRestaurantAccess('branches'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.listBranches(String(req.params.restaurantId));
@@ -470,6 +527,7 @@ restaurantRouter.get(
 restaurantRouter.post(
   '/:restaurantId/branches',
   requireRestaurantAccess('branches'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.createBranch(String(req.params.restaurantId), req.body);
@@ -483,6 +541,7 @@ restaurantRouter.post(
 restaurantRouter.patch(
   '/:restaurantId/branches/:branchId',
   requireRestaurantAccess('branches'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.updateBranch(
@@ -500,6 +559,7 @@ restaurantRouter.patch(
 restaurantRouter.delete(
   '/:restaurantId/branches/:branchId',
   requireRestaurantAccess('branches'),
+  requireActiveSubscription(),
   async (req, res, next) => {
     try {
       const data = await RestaurantService.deleteBranch(
