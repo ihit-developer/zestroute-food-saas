@@ -847,7 +847,17 @@ export const SubscriptionsPage: React.FC = () => {
               <Dropdown
                 label="Subscription Status"
                 value={manageStatus}
-                onChange={(v) => setManageStatus(v as 'active' | 'trial' | 'expired' | 'suspended')}
+                onChange={(v) => {
+                  const next = v as 'active' | 'trial' | 'expired' | 'suspended';
+                  setManageStatus(next);
+                  if (next === 'trial') {
+                    setManageCycle('trial');
+                    setManageDays(String(data?.trialConfig?.defaultTrialDays ?? 7));
+                  } else if (next === 'active' && manageCycle === 'trial') {
+                    setManageCycle('monthly');
+                    setManageDays('30');
+                  }
+                }}
                 options={[
                   { label: 'Active (Full Access)', value: 'active' },
                   { label: 'Free Trial', value: 'trial' },
@@ -858,11 +868,24 @@ export const SubscriptionsPage: React.FC = () => {
               <Dropdown
                 label="Billing Cycle"
                 value={manageCycle}
-                onChange={(v) => setManageCycle(v as 'monthly' | 'yearly' | 'trial')}
+                onChange={(v) => {
+                  const next = v as 'monthly' | 'yearly' | 'trial';
+                  setManageCycle(next);
+                  if (next === 'trial') {
+                    setManageStatus('trial');
+                    setManageDays(String(data?.trialConfig?.defaultTrialDays ?? 7));
+                  } else if (next === 'monthly') {
+                    if (manageStatus === 'trial') setManageStatus('active');
+                    setManageDays('30');
+                  } else if (next === 'yearly') {
+                    if (manageStatus === 'trial') setManageStatus('active');
+                    setManageDays('365');
+                  }
+                }}
                 options={[
-                  { label: 'Monthly', value: 'monthly' },
-                  { label: 'Yearly', value: 'yearly' },
-                  { label: 'Trial', value: 'trial' },
+                  { label: 'Monthly (30 Days)', value: 'monthly' },
+                  { label: 'Yearly (365 Days)', value: 'yearly' },
+                  { label: 'Free Trial (7 Days)', value: 'trial' },
                 ]}
               />
             </div>
