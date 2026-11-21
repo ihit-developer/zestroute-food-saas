@@ -49,6 +49,7 @@ import {
   useToast,
 } from '../../components/ui';
 import { httpClient, tokenStorage } from '../../services/apiClient';
+import { saveAccount } from '../../services/savedAccounts';
 import { useAppStore } from '../../store/useAppStore';
 import { playAlertChime } from '../../utils/soundAlert';
 
@@ -192,6 +193,12 @@ export default function UnifiedRiderDashboardScreen() {
   const [payoutAccountTitle, setPayoutAccountTitle] = useState('');
   const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Change Password form state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const loadAll = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -406,6 +413,44 @@ export default function UnifiedRiderDashboardScreen() {
       showToast(err instanceof Error ? err.message : 'Failed to update profile', 'error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      showToast('Enter your current password', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToast('New password must be at least 8 characters', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New password and confirm password do not match', 'error');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await httpClient.patch('/rider/password', {
+        currentPassword,
+        newPassword,
+      });
+      if (profile?.email || user?.email) {
+        await saveAccount({
+          identifier: profile?.email || user?.email || '',
+          password: newPassword,
+          fullName: profile?.fullName || user?.fullName || 'Rider',
+          role: 'rider',
+        }).catch(() => {});
+      }
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast('Password updated successfully!', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Unable to update password', 'error');
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -1429,6 +1474,48 @@ export default function UnifiedRiderDashboardScreen() {
                 fullWidth
                 disabled={savingProfile}
                 onPress={() => void handleSaveProfile()}
+              />
+            </View>
+
+            {/* Rider Change Password Card */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.xl, gap: 12 },
+              ]}
+            >
+              <View style={styles.row}>
+                <ShieldCheck size={18} color="#16A34A" />
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.textPrimary }}>
+                  Change Account Password
+                </Text>
+              </View>
+              <InputField
+                label="Current Password"
+                placeholder="Enter current password"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+              />
+              <InputField
+                label="New Password (min 8 characters)"
+                placeholder="Enter new password"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+              <InputField
+                label="Confirm New Password"
+                placeholder="Re-enter new password"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+              <PrimaryButton
+                title={savingPassword ? 'Updating Password...' : 'Update Password'}
+                fullWidth
+                disabled={savingPassword}
+                onPress={() => void handleChangePassword()}
               />
             </View>
 

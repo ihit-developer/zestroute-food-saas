@@ -176,3 +176,14 @@ riderRouter.patch('/profile', async (req, res, next) => {
     next(err);
   }
 });
+
+riderRouter.patch('/password', async (req, res, next) => {
+  try {
+    const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+    const data = await RiderService.changePassword(req.auth!.userId, currentPassword, newPassword);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});

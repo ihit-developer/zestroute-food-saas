@@ -66,8 +66,14 @@ const RootNavigator: React.FC = () => {
           <Text style={styles.offlineText}>No internet connection. Reconnecting...</Text>
         </View>
       )}
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        <Stack.Screen name="index" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="index" options={{ contentStyle: { backgroundColor: '#0F172A' } }} />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />

@@ -12,7 +12,7 @@ import {
   RiderModel,
   RiderPayoutModel,
 } from '../models/index.js';
-import { hashToken } from '../utils/crypto.js';
+import { hashPassword, hashToken, verifyPassword } from '../utils/crypto.js';
 import { AppError } from '../middleware/error.middleware.js';
 import { emitOrderStatusChanged, emitRiderLocation } from '../sockets/socketGateway.js';
 
@@ -809,5 +809,25 @@ export class RiderService {
       status: created.status,
       createdAt: String(created.createdAt),
     };
+  }
+
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    if (!newPassword || newPassword.length < 8) {
+      throw new AppError(400, 'WEAK_PASSWORD', 'New password must be at least 8 characters');
+    }
+    if (!currentPassword) {
+      throw new AppError(400, 'CURRENT_PASSWORD_REQUIRED', 'Please enter your current password');
+    }
+    const profile = await ProfileModel.findById(userId).select('+passwordHash');
+    if (!profile) {
+      throw new AppError(404, 'PROFILE_NOT_FOUND', 'Rider account not found');
+    }
+    const valid = await verifyPassword(currentPassword, profile.passwordHash);
+    if (!valid) {
+      throw new AppError(400, 'INVALID_CURRENT_PASSWORD', 'Current password is incorrect');
+    }
+    profile.passwordHash = await hashPassword(newPassword);
+    await profile.save();
+    return { updated: true };
   }
 }
