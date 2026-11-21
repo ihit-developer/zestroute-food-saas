@@ -416,12 +416,20 @@ export const SubscriptionsPage: React.FC = () => {
                 },
                 {
                   key: 'packageName',
-                  header: 'Plan',
+                  header: 'Active Plan & Cycle',
                   render: (r) => (
                     <div>
-                      <div style={{ fontWeight: 700 }}>{r.packageName}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)', textTransform: 'capitalize' }}>
-                        {r.billingCycle}
+                      <div style={{ fontWeight: 800 }}>
+                        {r.status === 'trial'
+                          ? r.packageName
+                          : `${r.packageName} — ${r.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)' }}>
+                        {r.status === 'trial'
+                          ? 'Free Trial Period'
+                          : r.billingCycle === 'yearly'
+                            ? 'Annual Subscription'
+                            : 'Monthly Subscription'}
                       </div>
                     </div>
                   ),

@@ -188,16 +188,24 @@ export class SubscriptionService {
       features?: string[];
     } | null;
 
+    const { defaultTrialDays } = await this.getTrialConfig();
+    const resolvedPlanName =
+      sub.status === 'trial'
+        ? `${defaultTrialDays}-Day Free Trial`
+        : pkg?.name ?? 'Standard';
+
     return {
       id: String(sub._id),
       status: sub.status,
       isAccessAllowed,
       isTrial: sub.status === 'trial',
-      billingCycle: sub.billingCycle,
+      billingCycle: sub.status === 'trial' ? 'trial' : sub.billingCycle,
       packageId: pkg?._id ? String(pkg._id) : null,
-      packageName: pkg?.name ?? (sub.status === 'trial' ? 'Free Trial (Full Access)' : 'Standard'),
-      platformAccess: pkg?.platformAccess ?? 'both',
+      packageName: resolvedPlanName,
+      platformAccess: sub.status === 'trial' ? 'both' : (pkg?.platformAccess ?? 'both'),
       features: pkg?.features ?? [],
+      trialStartDate: sub.trialStartsAt ? sub.trialStartsAt.toISOString() : undefined,
+      trialEndDate: sub.trialEndsAt ? sub.trialEndsAt.toISOString() : undefined,
       startsAt: sub.currentPeriodStart ? sub.currentPeriodStart.toISOString() : null,
       expiresAt: expiryDate.toISOString(),
       remainingDays,
@@ -541,6 +549,11 @@ export class SubscriptionService {
         s.status === 'trial' && s.trialEndsAt ? new Date(s.trialEndsAt) : new Date(s.currentPeriodEnd);
       const remainingDays = Math.max(0, Math.ceil((exp.getTime() - now.getTime()) / MS_PER_DAY));
       const isAccessAllowed = (s.status === 'trial' || s.status === 'active') && exp > now;
+      const resolvedPkgName =
+        s.status === 'trial'
+          ? `${trialConfig.defaultTrialDays}-Day Free Trial`
+          : pkg?.name ?? 'Standard';
+      const resolvedCycle = s.status === 'trial' ? 'trial' : s.billingCycle;
       return {
         id: String(s._id),
         restaurantId: String(rest?._id ?? s.restaurantId),
@@ -548,8 +561,8 @@ export class SubscriptionService {
         ownerName: owner?.fullName ?? 'Partner',
         ownerEmail: owner?.email ?? '',
         packageId: pkg?._id ? String(pkg._id) : null,
-        packageName: pkg?.name ?? (s.status === 'trial' ? 'Free Trial' : 'Standard'),
-        billingCycle: s.billingCycle,
+        packageName: resolvedPkgName,
+        billingCycle: resolvedCycle,
         status: s.status,
         isAccessAllowed,
         startsAt: String(s.currentPeriodStart),
@@ -753,7 +766,10 @@ export class SubscriptionService {
 
     if (input.grantFreeAccess) {
       sub.status = 'active';
-      if (sub.billingCycle === 'trial') sub.billingCycle = 'monthly';
+      if (!input.billingCycle) {
+        const totalDays = input.setDaysFromNow ?? input.extendDays ?? 30;
+        sub.billingCycle = totalDays >= 365 ? 'yearly' : 'monthly';
+      }
       if (new Date(sub.currentPeriodEnd) <= now) {
         sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
       }

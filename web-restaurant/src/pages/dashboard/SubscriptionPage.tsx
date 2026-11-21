@@ -20,6 +20,7 @@ import {
   PrimaryButton,
   SecondaryButton,
   StatusBadge,
+  Tabs,
   useToast,
 } from '../../components/ui';
 import { useRestaurantStore } from '../../store/useRestaurantStore';
@@ -84,9 +85,10 @@ export const SubscriptionPage: React.FC = () => {
   const queryClient = useQueryClient();
   const restaurantId = useRestaurantStore((s) => s.restaurantId);
 
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [activeTab, setActiveTab] = useState<'trial' | 'monthly' | 'yearly' | 'payments'>('monthly');
   const [selectedPkg, setSelectedPkg] = useState<SubscriptionPackage | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'jazzcash' | 'easypaisa' | 'bank_transfer' | 'card'>('jazzcash');
+  const [checkoutCycle, setCheckoutCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [paymentMethod, setPaymentMethod] = useState<'easypaisa' | 'jazzcash' | 'bank_transfer' | 'card'>('easypaisa');
   const [transactionRef, setTransactionRef] = useState('');
   const [senderAccount, setSenderAccount] = useState('');
   const [proofUrl, setProofUrl] = useState('');
@@ -103,6 +105,11 @@ export const SubscriptionPage: React.FC = () => {
   const sub = data?.subscription;
   const badgeInfo = STATUS_BADGE_MAP[sub?.status ?? 'trial'] ?? { label: sub?.status ?? 'Trial', tone: 'info' as const };
 
+  const openCheckout = (pkg: SubscriptionPackage, cycle: 'monthly' | 'yearly') => {
+    setSelectedPkg(pkg);
+    setCheckoutCycle(cycle);
+  };
+
   const handleSubmitPayment = async () => {
     if (!restaurantId || !selectedPkg) return;
     if (!transactionRef.trim()) {
@@ -113,7 +120,7 @@ export const SubscriptionPage: React.FC = () => {
     try {
       await restaurantHttpClient.post(`/restaurant/${restaurantId}/subscription/payments`, {
         packageId: selectedPkg.id,
-        billingCycle,
+        billingCycle: checkoutCycle,
         paymentMethod,
         transactionRef: transactionRef.trim(),
         senderAccount: senderAccount.trim() || 'Provided via TID',
@@ -126,6 +133,7 @@ export const SubscriptionPage: React.FC = () => {
       setSenderAccount('');
       setProofUrl('');
       setNotes('');
+      setActiveTab('payments');
       showToast('Payment submitted! Waiting for Super Admin verification.');
     } catch (err) {
       showToast(err instanceof ApiClientError ? err.message : 'Unable to submit payment');
@@ -137,13 +145,98 @@ export const SubscriptionPage: React.FC = () => {
   if (isLoading || !data || !sub) {
     return (
       <div className="zr-card" style={{ padding: 28, textAlign: 'center', color: 'var(--zr-text-secondary)' }}>
-        Loading subscription status & plans...
+        Loading subscription status &amp; plans...
       </div>
     );
   }
 
+  const trialDays = data.defaultTrialDays || 7;
+
+  const renderPackageGrid = (cycle: 'monthly' | 'yearly') => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 18 }}>
+      {data.packages.map((pkg, idx) => {
+        const priceMinor = cycle === 'yearly' ? pkg.yearlyPriceMinor : pkg.monthlyPriceMinor;
+        const isCurrent =
+          sub.status === 'active' && sub.packageId === pkg.id && sub.billingCycle === cycle;
+        const isPopular = idx === 1;
+        return (
+          <div
+            key={pkg.id}
+            className="zr-card"
+            style={{
+              padding: 22,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 16,
+              border: isPopular ? '2px solid var(--zr-primary)' : '1px solid var(--zr-border)',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 18, fontWeight: 900 }}>{pkg.name}</span>
+                {isCurrent ? (
+                  <StatusBadge label="Current Plan" tone="success" />
+                ) : isPopular ? (
+                  <StatusBadge label="Most Popular" tone="info" />
+                ) : null}
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <StatusBadge
+                  label={
+                    pkg.platformAccess === 'web_only'
+                      ? 'Includes: Website Portal Only'
+                      : pkg.platformAccess === 'mobile_only'
+                        ? 'Includes: Mobile App Only'
+                        : 'Includes: Website + Mobile App'
+                  }
+                  tone={
+                    pkg.platformAccess === 'web_only'
+                      ? 'info'
+                      : pkg.platformAccess === 'mobile_only'
+                        ? 'warning'
+                        : 'success'
+                  }
+                />
+              </div>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--zr-text-secondary)', minHeight: 38 }}>
+                {pkg.description}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 16 }}>
+                <span style={{ fontSize: 28, fontWeight: 900, color: 'var(--zr-text-primary)' }}>
+                  {formatMoney(priceMinor)}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--zr-text-secondary)', fontWeight: 600 }}>
+                  / {cycle === 'yearly' ? 'year' : 'month'}
+                </span>
+              </div>
+
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {pkg.features.map((feat, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5 }}>
+                    <Check size={16} color="var(--zr-primary)" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <PrimaryButton
+              leftIcon={isCurrent ? <Sparkles size={15} /> : <CreditCard size={15} />}
+              onClick={() => openCheckout(pkg, cycle)}
+            >
+              {isCurrent
+                ? `Renew ${pkg.name} (${cycle === 'yearly' ? 'Yearly' : 'Monthly'})`
+                : `Subscribe to ${pkg.name}`}
+            </PrimaryButton>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Expiration / Suspension Alert Banner */}
       {!sub.isAccessAllowed ? (
         <div
@@ -178,7 +271,7 @@ export const SubscriptionPage: React.FC = () => {
         </div>
       ) : null}
 
-      {/* Current Subscription Hero Card */}
+      {/* Current Active Subscription Hero Card */}
       <div
         className="zr-card"
         style={{
@@ -195,10 +288,18 @@ export const SubscriptionPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <StatusBadge label={badgeInfo.label} tone={badgeInfo.tone} />
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--zr-text-secondary)', textTransform: 'uppercase' }}>
-              {sub.billingCycle === 'trial' ? 'Full-Access Trial' : `${sub.billingCycle} Billing`}
+              {sub.status === 'trial'
+                ? `${trialDays}-Day Free Trial`
+                : sub.billingCycle === 'yearly'
+                  ? 'Yearly Subscription'
+                  : 'Monthly Subscription'}
             </span>
           </div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>{sub.packageName}</h2>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>
+            {sub.status === 'trial'
+              ? sub.packageName
+              : `${sub.packageName} — ${sub.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+          </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--zr-text-secondary)' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--zr-text-primary)' }}>
               <Clock size={15} />
@@ -217,228 +318,195 @@ export const SubscriptionPage: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              padding: '12px 18px',
-              borderRadius: 14,
-              background: 'var(--zr-surface)',
-              border: '1px solid var(--zr-border)',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 26, fontWeight: 900, color: sub.isAccessAllowed ? 'var(--zr-primary)' : '#DC2626' }}>
-              {sub.remainingDays}
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--zr-text-secondary)', textTransform: 'uppercase' }}>
-              Days Left
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Billing Cycle Toggle + Packages Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Subscription Packages</h3>
-          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--zr-text-secondary)' }}>
-            Upgrade or renew anytime. Early renewals preserve your remaining active days.
-          </p>
-        </div>
-
         <div
           style={{
-            display: 'inline-flex',
+            padding: '12px 18px',
+            borderRadius: 14,
             background: 'var(--zr-surface)',
             border: '1px solid var(--zr-border)',
-            borderRadius: 12,
-            padding: 4,
-            gap: 4,
+            textAlign: 'center',
           }}
         >
-          <button
-            type="button"
-            onClick={() => setBillingCycle('monthly')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 9,
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 800,
-              fontSize: 13,
-              background: billingCycle === 'monthly' ? 'var(--zr-primary)' : 'transparent',
-              color: billingCycle === 'monthly' ? '#FFFFFF' : 'var(--zr-text-secondary)',
-            }}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBillingCycle('yearly')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 9,
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 800,
-              fontSize: 13,
-              background: billingCycle === 'yearly' ? 'var(--zr-primary)' : 'transparent',
-              color: billingCycle === 'yearly' ? '#FFFFFF' : 'var(--zr-text-secondary)',
-            }}
-          >
-            Yearly (Save 2 Months)
-          </button>
-        </div>
-      </div>
-
-      {/* Dynamic Packages Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 18 }}>
-        {data.packages.map((pkg, idx) => {
-          const priceMinor = billingCycle === 'yearly' ? pkg.yearlyPriceMinor : pkg.monthlyPriceMinor;
-          const isCurrent = sub.packageId === pkg.id && sub.status === 'active';
-          const isPopular = idx === 1;
-          return (
-            <div
-              key={pkg.id}
-              className="zr-card"
-              style={{
-                padding: 22,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: 16,
-                border: isPopular ? '2px solid var(--zr-primary)' : '1px solid var(--zr-border)',
-                position: 'relative',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 18, fontWeight: 900 }}>{pkg.name}</span>
-                  {isCurrent ? (
-                    <StatusBadge label="Current Plan" tone="success" />
-                  ) : isPopular ? (
-                    <StatusBadge label="Most Popular" tone="info" />
-                  ) : null}
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <StatusBadge
-                    label={
-                      pkg.platformAccess === 'web_only'
-                        ? 'Includes: Website Portal Only'
-                        : pkg.platformAccess === 'mobile_only'
-                          ? 'Includes: Mobile App Only'
-                          : 'Includes: Website + Mobile App'
-                    }
-                    tone={
-                      pkg.platformAccess === 'web_only'
-                        ? 'info'
-                        : pkg.platformAccess === 'mobile_only'
-                          ? 'warning'
-                          : 'success'
-                    }
-                  />
-                </div>
-                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--zr-text-secondary)', minHeight: 38 }}>
-                  {pkg.description}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 16 }}>
-                  <span style={{ fontSize: 28, fontWeight: 900, color: 'var(--zr-text-primary)' }}>
-                    {formatMoney(priceMinor)}
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--zr-text-secondary)', fontWeight: 600 }}>
-                    / {billingCycle === 'yearly' ? 'year' : 'month'}
-                  </span>
-                </div>
-
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  {pkg.features.map((feat, i) => (
-                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5 }}>
-                      <Check size={16} color="var(--zr-primary)" style={{ flexShrink: 0, marginTop: 2 }} />
-                      <span>{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <PrimaryButton
-                leftIcon={isCurrent ? <Sparkles size={15} /> : <CreditCard size={15} />}
-                onClick={() => setSelectedPkg(pkg)}
-              >
-                {isCurrent ? `Renew ${pkg.name}` : `Subscribe to ${pkg.name}`}
-              </PrimaryButton>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Payment History Table */}
-      <div className="zr-card" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Subscription Payment History</h3>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--zr-text-secondary)' }}>
-              Track all submitted payments and Super Admin verification status.
-            </p>
+          <div style={{ fontSize: 26, fontWeight: 900, color: sub.isAccessAllowed ? 'var(--zr-primary)' : '#DC2626' }}>
+            {sub.remainingDays}
           </div>
-          <ShieldCheck size={20} color="var(--zr-primary)" />
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--zr-text-secondary)', textTransform: 'uppercase' }}>
+            Days Left
+          </div>
         </div>
-
-        {data.payments.length === 0 ? (
-          <EmptyState
-            title="No subscription payments yet"
-            description="Select a package above when you are ready to subscribe or renew."
-          />
-        ) : (
-          <DataTable<PaymentRecord>
-            data={data.payments}
-            rowKey={(r) => r.id}
-            columns={[
-              { key: 'packageName', header: 'Package', render: (r) => <strong>{r.packageName}</strong> },
-              {
-                key: 'billingCycle',
-                header: 'Cycle',
-                render: (r) => <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{r.billingCycle}</span>,
-              },
-              {
-                key: 'amountMinor',
-                header: 'Amount',
-                render: (r) => <strong>{formatMoney(r.amountMinor)}</strong>,
-              },
-              {
-                key: 'paymentMethod',
-                header: 'Method',
-                render: (r) => <span style={{ textTransform: 'uppercase', fontSize: 12, fontWeight: 700 }}>{r.paymentMethod.replace('_', ' ')}</span>,
-              },
-              { key: 'transactionRef', header: 'Transaction Ref', render: (r) => <span>{r.transactionRef}</span> },
-              {
-                key: 'createdAt',
-                header: 'Submitted',
-                render: (r) => <span>{new Date(r.createdAt).toLocaleDateString()}</span>,
-              },
-              {
-                key: 'status',
-                header: 'Status',
-                render: (r) => (
-                  <div>
-                    <StatusBadge
-                      label={r.status === 'approved' ? 'Approved' : r.status === 'rejected' ? 'Rejected' : 'Pending Review'}
-                      tone={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'error' : 'warning'}
-                    />
-                    {r.status === 'rejected' && r.rejectionReason ? (
-                      <div style={{ fontSize: 11.5, color: '#DC2626', marginTop: 4 }}>{r.rejectionReason}</div>
-                    ) : null}
-                  </div>
-                ),
-              },
-            ]}
-          />
-        )}
       </div>
+
+      {/* Dedicated Tabs: 7-Day Free Trial | Monthly Plans | Yearly Plans | Payments & History */}
+      <Tabs
+        items={[
+          { key: 'trial', label: `${trialDays}-Day Free Trial` },
+          { key: 'monthly', label: 'Monthly Plans' },
+          { key: 'yearly', label: 'Yearly Plans (Save 2 Mos)' },
+          { key: 'payments', label: `Payments & History (${data.payments.length})` },
+        ]}
+        activeKey={activeTab}
+        onChange={(k) => setActiveTab(k as 'trial' | 'monthly' | 'yearly' | 'payments')}
+      />
+
+      {/* TAB 1: 7-DAY FREE TRIAL */}
+      {activeTab === 'trial' ? (
+        <div className="zr-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>{trialDays}-Day Full-Access Free Trial</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--zr-text-secondary)' }}>
+                Every new restaurant on Dastarkhwan starts with a complete {trialDays}-day free trial across Web &amp; Mobile.
+              </p>
+            </div>
+            <StatusBadge
+              label={
+                sub.status === 'trial'
+                  ? `Active · ${sub.remainingDays}d Left`
+                  : sub.status === 'active'
+                    ? 'Upgraded to Paid Plan'
+                    : 'Trial Ended'
+              }
+              tone={sub.status === 'trial' ? 'info' : sub.status === 'active' ? 'success' : 'error'}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ padding: 14, borderRadius: 12, background: 'var(--zr-surface-alt)', border: '1px solid var(--zr-border)' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--zr-text-secondary)' }}>TRIAL DURATION</div>
+              <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>{trialDays} Days Free</div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 12, background: 'var(--zr-surface-alt)', border: '1px solid var(--zr-border)' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--zr-text-secondary)' }}>TRIAL START</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>
+                {sub.trialStartDate ? new Date(sub.trialStartDate).toLocaleDateString() : 'Auto-activated'}
+              </div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 12, background: 'var(--zr-surface-alt)', border: '1px solid var(--zr-border)' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--zr-text-secondary)' }}>TRIAL EXPIRES</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>
+                {sub.trialEndDate
+                  ? new Date(sub.trialEndDate).toLocaleDateString()
+                  : sub.expiresAt
+                    ? new Date(sub.expiresAt).toLocaleDateString()
+                    : '—'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <PrimaryButton onClick={() => setActiveTab('monthly')}>Browse Monthly Plans</PrimaryButton>
+            <SecondaryButton onClick={() => setActiveTab('yearly')}>Browse Yearly Plans (Save 2 Months)</SecondaryButton>
+          </div>
+        </div>
+      ) : null}
+
+      {/* TAB 2: MONTHLY PLANS */}
+      {activeTab === 'monthly' ? renderPackageGrid('monthly') : null}
+
+      {/* TAB 3: YEARLY PLANS */}
+      {activeTab === 'yearly' ? renderPackageGrid('yearly') : null}
+
+      {/* TAB 4: PAYMENTS & HISTORY */}
+      {activeTab === 'payments' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div
+            className="zr-card"
+            style={{
+              padding: 18,
+              background: 'var(--zr-surface-alt)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--zr-primary)', textTransform: 'uppercase' }}>
+                Official Admin Payment Accounts
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
+                {data.paymentInstructions || 'Easypaisa: 0329-5931738 | JazzCash: 0329-5931738 (Dastarkhwan Admin)'}
+              </div>
+            </div>
+            <PrimaryButton leftIcon={<CreditCard size={15} />} onClick={() => setActiveTab('monthly')}>
+              Choose Plan &amp; Pay
+            </PrimaryButton>
+          </div>
+
+          <div className="zr-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Subscription Payment History</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--zr-text-secondary)' }}>
+                  Track all submitted payments and Super Admin verification status.
+                </p>
+              </div>
+              <ShieldCheck size={20} color="var(--zr-primary)" />
+            </div>
+
+            {data.payments.length === 0 ? (
+              <EmptyState
+                title="No subscription payments yet"
+                description="Switch to Monthly Plans or Yearly Plans above when you are ready to subscribe or renew."
+              />
+            ) : (
+              <DataTable<PaymentRecord>
+                data={data.payments}
+                rowKey={(r) => r.id}
+                columns={[
+                  { key: 'packageName', header: 'Package', render: (r) => <strong>{r.packageName}</strong> },
+                  {
+                    key: 'billingCycle',
+                    header: 'Cycle',
+                    render: (r) => <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{r.billingCycle}</span>,
+                  },
+                  {
+                    key: 'amountMinor',
+                    header: 'Amount',
+                    render: (r) => <strong>{formatMoney(r.amountMinor)}</strong>,
+                  },
+                  {
+                    key: 'paymentMethod',
+                    header: 'Method',
+                    render: (r) => (
+                      <span style={{ textTransform: 'uppercase', fontSize: 12, fontWeight: 700 }}>
+                        {r.paymentMethod.replace('_', ' ')}
+                      </span>
+                    ),
+                  },
+                  { key: 'transactionRef', header: 'Transaction Ref', render: (r) => <span>{r.transactionRef}</span> },
+                  {
+                    key: 'createdAt',
+                    header: 'Submitted',
+                    render: (r) => <span>{new Date(r.createdAt).toLocaleDateString()}</span>,
+                  },
+                  {
+                    key: 'status',
+                    header: 'Status',
+                    render: (r) => (
+                      <div>
+                        <StatusBadge
+                          label={r.status === 'approved' ? 'Approved' : r.status === 'rejected' ? 'Rejected' : 'Pending Review'}
+                          tone={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'error' : 'warning'}
+                        />
+                        {r.status === 'rejected' && r.rejectionReason ? (
+                          <div style={{ fontSize: 11.5, color: '#DC2626', marginTop: 4 }}>{r.rejectionReason}</div>
+                        ) : null}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Payment Submission Modal */}
       <Modal
         open={Boolean(selectedPkg)}
-        title={selectedPkg ? `Pay for ${selectedPkg.name} (${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'})` : ''}
+        title={selectedPkg ? `Pay for ${selectedPkg.name} (${checkoutCycle === 'yearly' ? 'Yearly' : 'Monthly'})` : ''}
         onClose={() => setSelectedPkg(null)}
         footer={
           <>
@@ -466,7 +534,7 @@ export const SubscriptionPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--zr-text-secondary)' }}>Authoritative Amount Due</span>
                 <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--zr-primary)' }}>
-                  {formatMoney(billingCycle === 'yearly' ? selectedPkg.yearlyPriceMinor : selectedPkg.monthlyPriceMinor)}
+                  {formatMoney(checkoutCycle === 'yearly' ? selectedPkg.yearlyPriceMinor : selectedPkg.monthlyPriceMinor)}
                 </span>
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--zr-text-secondary)', lineHeight: 1.55 }}>
@@ -478,10 +546,10 @@ export const SubscriptionPage: React.FC = () => {
             <Dropdown
               label="Payment Method"
               value={paymentMethod}
-              onChange={(v) => setPaymentMethod(v as 'jazzcash' | 'easypaisa' | 'bank_transfer' | 'card')}
+              onChange={(v) => setPaymentMethod(v as 'easypaisa' | 'jazzcash' | 'bank_transfer' | 'card')}
               options={[
-                { label: 'JazzCash', value: 'jazzcash' },
-                { label: 'Easypaisa', value: 'easypaisa' },
+                { label: 'Easypaisa (0329-5931738)', value: 'easypaisa' },
+                { label: 'JazzCash (0329-5931738)', value: 'jazzcash' },
                 { label: 'Bank Transfer (IBFT)', value: 'bank_transfer' },
                 { label: 'Card / Online Transfer', value: 'card' },
               ]}
