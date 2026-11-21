@@ -4,11 +4,9 @@ import { createAuthApi, createHttpClient, type TokenStorageAdapter } from '@zest
 const ACCESS_KEY = 'zr_customer_access_token';
 const REFRESH_KEY = 'zr_customer_refresh_token';
 
+const webHostname = (globalThis as { location?: { hostname?: string } }).location?.hostname;
 const isRemoteWeb =
-  typeof window !== 'undefined' &&
-  Boolean(window.location?.hostname) &&
-  window.location.hostname !== 'localhost' &&
-  window.location.hostname !== '127.0.0.1';
+  Boolean(webHostname) && webHostname !== 'localhost' && webHostname !== '127.0.0.1';
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||

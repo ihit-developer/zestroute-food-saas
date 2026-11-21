@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, Bike, Sparkles, User, X } from 'lucide-react-native';
+import {
+  ArrowRight,
+  Bike,
+  MapPin,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  User,
+  X,
+} from 'lucide-react-native';
 import { ApiClientError } from '@zestroute/shared';
 import { useTheme } from '../../hooks/useTheme';
-import { PrimaryButton, SecondaryButton, ZestRouteLogo, useToast } from '../../components/ui';
+import { PrimaryButton, SecondaryButton, useToast } from '../../components/ui';
 import { authApi, tokenStorage } from '../../services/apiClient';
 import {
   getSavedAccounts,
@@ -15,9 +24,11 @@ import {
 } from '../../services/savedAccounts';
 import { useAppStore } from '../../store/useAppStore';
 
+const APP_LOGO = require('../../assets/icon.png');
+
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { colors, radii, strings } = useTheme();
+  const { colors, radii } = useTheme();
   const { showToast } = useToast();
   const setSession = useAppStore((s) => s.setSession);
 
@@ -68,18 +79,45 @@ export default function WelcomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <View style={styles.hero}>
-        <ZestRouteLogo size={54} />
-        <Text style={[styles.heading, { color: colors.textPrimary }]}>
-          Delicious meals from local kitchens, right to your door.
-        </Text>
-        <Text style={[styles.sub, { color: colors.textSecondary }]}>
-          {strings.brandTagline} · Sign in once and switch between your saved accounts with 1 tap.
-        </Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Executive Brand Hero Card */}
+        <View style={[styles.heroCard, { borderRadius: radii.xl }]}>
+          <View style={styles.brandRow}>
+            <Image source={APP_LOGO} style={styles.logoImg} resizeMode="cover" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brandTitle}>
+                Zest<Text style={{ color: '#FDBA74' }}>Route</Text>
+              </Text>
+              <Text style={styles.brandSub}>Multi-Restaurant Food Delivery</Text>
+            </View>
+            <View style={styles.liveTag}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          </View>
 
-      <View style={styles.actions}>
-        {/* Saved Accounts (Appears automatically after user logs in once!) */}
+          <Text style={styles.heroHeadline}>
+            Fresh food from top kitchens, tracked live to your door.
+          </Text>
+
+          <View style={styles.featureGrid}>
+            {[
+              { icon: Store, label: 'Top Kitchens' },
+              { icon: MapPin, label: 'Live GPS Map' },
+              { icon: ShieldCheck, label: 'OTP Verified' },
+            ].map((f) => {
+              const IconComp = f.icon;
+              return (
+                <View key={f.label} style={styles.featurePill}>
+                  <IconComp size={14} color="#FDBA74" />
+                  <Text style={styles.featureText}>{f.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Saved Accounts (Appears automatically after user logs in once) */}
         {savedAccounts.length > 0 ? (
           <View
             style={[
@@ -89,8 +127,8 @@ export default function WelcomeScreen() {
           >
             <View style={styles.savedHeader}>
               <Sparkles size={14} color={colors.primary} />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary }}>
-                SAVED ACCOUNTS · TAP TO CONTINUE
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.4 }}>
+                SAVED ACCOUNTS · 1-TAP CONTINUE
               </Text>
             </View>
             {savedAccounts.map((acct) => {
@@ -148,27 +186,69 @@ export default function WelcomeScreen() {
           </View>
         ) : null}
 
-        <PrimaryButton
-          title={savedAccounts.length > 0 ? 'Sign In with Another Account' : 'Sign In (Customer / Rider)'}
-          fullWidth
-          onPress={() => router.push('/(auth)/login')}
-        />
-        <SecondaryButton
-          title="Create Account (Customer / Rider)"
-          fullWidth
-          onPress={() => router.push('/(auth)/register')}
-        />
-      </View>
+        {/* Action Buttons */}
+        <View style={styles.actions}>
+          <PrimaryButton
+            title={savedAccounts.length > 0 ? 'Sign In with Another Account' : 'Sign In (Customer / Rider)'}
+            fullWidth
+            onPress={() => router.push('/(auth)/login')}
+          />
+          <SecondaryButton
+            title="Create New Account"
+            fullWidth
+            onPress={() => router.push('/(auth)/register')}
+          />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, padding: 24, justifyContent: 'space-between' },
-  hero: { marginTop: 36, gap: 14 },
-  heading: { fontSize: 28, fontWeight: '800', lineHeight: 36, marginTop: 8 },
-  sub: { fontSize: 15, lineHeight: 22 },
-  actions: { gap: 12, paddingBottom: 12 },
+  safe: { flex: 1 },
+  scroll: { flexGrow: 1, padding: 20, justifyContent: 'space-between', gap: 18 },
+  heroCard: {
+    backgroundColor: '#0F172A',
+    padding: 22,
+    gap: 18,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logoImg: { width: 58, height: 58, borderRadius: 16 },
+  brandTitle: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.4 },
+  brandSub: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
+  liveTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(22,163,74,0.2)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#4ADE80' },
+  liveText: { fontSize: 10, fontWeight: '800', color: '#4ADE80', letterSpacing: 0.5 },
+  heroHeadline: {
+    fontSize: 25,
+    fontWeight: '800',
+    lineHeight: 33,
+    color: '#FFFFFF',
+  },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  featurePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  featureText: { fontSize: 11.5, fontWeight: '700', color: '#E2E8F0' },
   savedBox: { padding: 14, borderWidth: 1, gap: 10 },
   savedHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   savedRow: {
@@ -185,4 +265,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  actions: { gap: 12, paddingBottom: 8 },
 });

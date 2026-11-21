@@ -1,24 +1,25 @@
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
-import { ZestRouteLogo } from '../components/ui';
 import { useAppStore } from '../store/useAppStore';
 import { authApi, tokenStorage } from '../services/apiClient';
 
+const APP_LOGO = require('../assets/icon.png');
+
 export default function SplashScreen() {
   const router = useRouter();
-  const { colors, strings } = useTheme();
+  const { strings } = useTheme();
   const setHasCompletedOnboarding = useAppStore((s) => s.setHasCompletedOnboarding);
   const setSession = useAppStore((s) => s.setSession);
-  const scale = useRef(new Animated.Value(0.86)).current;
+  const scale = useRef(new Animated.Value(0.84)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6 }),
-      Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 480, useNativeDriver: true }),
     ]).start();
 
     const timer = setTimeout(async () => {
@@ -58,29 +59,94 @@ export default function SplashScreen() {
       } catch {
         router.replace('/onboarding');
       }
-    }, 1000);
+    }, 1050);
 
     return () => clearTimeout(timer);
   }, [opacity, router, scale, setHasCompletedOnboarding, setSession]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <Animated.View style={[styles.center, { opacity, transform: [{ scale }] }]}>
-        <ZestRouteLogo size={72} compact />
-        <Text style={[styles.brand, { color: colors.textPrimary }]}>
-          Zest<Text style={{ color: colors.primary }}>Route</Text>
+        <View style={styles.logoHalo}>
+          <Image source={APP_LOGO} style={styles.logoImg} resizeMode="cover" />
+        </View>
+        <Text style={styles.brand}>
+          Zest<Text style={{ color: '#F47B20' }}>Route</Text>
         </Text>
-        <Text style={[styles.tagline, { color: colors.textSecondary }]}>{strings.brandTagline}</Text>
+        <Text style={styles.tagline}>{strings.brandTagline}</Text>
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>CUSTOMER · RIDER · LIVE GPS</Text>
+        </View>
       </Animated.View>
-      <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator size="small" color="#F47B20" />
+        <Text style={styles.loaderText}>Connecting to ZestRoute...</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
   center: { alignItems: 'center', gap: 12 },
-  brand: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
-  tagline: { fontSize: 15, fontWeight: '500' },
-  loader: { position: 'absolute', bottom: 56 },
+  logoHalo: {
+    padding: 6,
+    borderRadius: 34,
+    backgroundColor: 'rgba(244, 123, 32, 0.2)',
+    shadowColor: '#F47B20',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  logoImg: {
+    width: 108,
+    height: 108,
+    borderRadius: 28,
+  },
+  brand: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.6,
+    marginTop: 4,
+  },
+  tagline: {
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  pill: {
+    marginTop: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#FDBA74',
+  },
+  loaderWrap: {
+    position: 'absolute',
+    bottom: 44,
+    alignItems: 'center',
+    gap: 8,
+  },
+  loaderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
 });
