@@ -115,8 +115,8 @@ export const SubscriptionPage: React.FC = () => {
         billingCycle,
         paymentMethod,
         transactionRef: transactionRef.trim(),
-        senderAccount: senderAccount.trim() || undefined,
-        proofUrl: proofUrl.trim() || undefined,
+        senderAccount: senderAccount.trim() || 'Provided via TID',
+        proofImageUrl: proofUrl.trim() || undefined,
         notes: notes.trim() || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ['restaurant', restaurantId, 'subscription'] });
@@ -450,8 +450,9 @@ export const SubscriptionPage: React.FC = () => {
                   {formatMoney(billingCycle === 'yearly' ? selectedPkg.yearlyPriceMinor : selectedPkg.monthlyPriceMinor)}
                 </span>
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--zr-text-secondary)', lineHeight: 1.5 }}>
-                {data.paymentInstructions}
+              <div style={{ fontSize: 12.5, color: 'var(--zr-text-secondary)', lineHeight: 1.55 }}>
+                {data.paymentInstructions ||
+                  'Easypaisa: 0329-5931738 | JazzCash: 0329-5931738 (Dastarkhwan Admin)'}
               </div>
             </div>
 

@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Ban,
   CheckCircle2,
-  Clock,
   Crown,
   Edit3,
+  Gift,
   Plus,
   Save,
   ShieldAlert,
+  SlidersHorizontal,
   Trash2,
   XCircle,
 } from 'lucide-react';
 import { ApiClientError, formatMoney } from '@zestroute/shared';
 import {
   DataTable,
+  Dropdown,
   EmptyState,
   InputField,
   Modal,
@@ -33,7 +36,7 @@ interface AdminPackage {
   yearlyPriceMinor: number;
   features: string[];
   isActive: boolean;
-  isTrialEligible: boolean;
+  trialEligible?: boolean;
   sortOrder: number;
 }
 
@@ -43,9 +46,10 @@ interface AdminVendorSub {
   restaurantName: string;
   ownerName: string;
   ownerEmail: string;
+  packageId?: string | null;
   packageName: string;
   status: 'trial' | 'active' | 'pending_payment' | 'expired' | 'suspended';
-  isAccessAllowed: boolean;
+  isAccessAllowed?: boolean;
   remainingDays: number;
   billingCycle: string;
   expiresAt: string | null;
@@ -53,7 +57,7 @@ interface AdminVendorSub {
 
 interface AdminPayment {
   id: string;
-  restaurantId: string;
+  restaurantId?: string;
   restaurantName: string;
   packageName: string;
   billingCycle: 'monthly' | 'yearly';
@@ -62,6 +66,7 @@ interface AdminPayment {
   transactionRef: string;
   senderAccount?: string;
   proofUrl?: string;
+  proofImageUrl?: string;
   notes?: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
@@ -73,8 +78,9 @@ interface AdminSubscriptionOverview {
     activeVendors: number;
     trialVendors: number;
     expiredVendors: number;
-    pendingPaymentsCount: number;
-    totalRevenueMinor: number;
+    pendingPaymentsCount?: number;
+    pendingPayments?: number;
+    totalRevenueMinor?: number;
     monthlyRevenueMinor: number;
     yearlyRevenueMinor: number;
   };
@@ -82,35 +88,46 @@ interface AdminSubscriptionOverview {
     defaultTrialDays: number;
     paymentInstructions: string;
   };
-  packages: AdminPackage[];
-  vendorSubscriptions: AdminVendorSub[];
-  payments: AdminPayment[];
+  packages?: AdminPackage[];
+  vendorSubscriptions?: AdminVendorSub[];
+  subscriptions?: AdminVendorSub[];
+  payments?: AdminPayment[];
 }
 
 export const SubscriptionsPage: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'payments' | 'vendors' | 'packages' | 'config'>('payments');
+  const [tab, setTab] = useState<'vendors' | 'payments' | 'packages' | 'config'>('vendors');
 
   // Package Modal State
   const [pkgModalOpen, setPkgModalOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<AdminPackage | null>(null);
   const [pkgName, setPkgName] = useState('');
   const [pkgDesc, setPkgDesc] = useState('');
-  const [pkgMonthlyPkr, setPkgMonthlyPkr] = useState('4999');
-  const [pkgYearlyPkr, setPkgYearlyPkr] = useState('49990');
+  const [pkgMonthlyPkr, setPkgMonthlyPkr] = useState('4900');
+  const [pkgYearlyPkr, setPkgYearlyPkr] = useState('49000');
   const [pkgFeatures, setPkgFeatures] = useState('');
   const [pkgOrder, setPkgOrder] = useState('1');
+
+  // Manage Vendor Subscription (Full Direct Super Admin Control / Free Friend Renewal / End Now)
+  const [manageTarget, setManageTarget] = useState<AdminVendorSub | null>(null);
+  const [managePkgId, setManagePkgId] = useState('');
+  const [manageStatus, setManageStatus] = useState<'active' | 'trial' | 'expired' | 'suspended'>('active');
+  const [manageCycle, setManageCycle] = useState<'monthly' | 'yearly' | 'trial'>('monthly');
+  const [manageDays, setManageDays] = useState('30');
+  const [manageExactDate, setManageExactDate] = useState('');
 
   // Reject Payment Modal State
   const [rejectTarget, setRejectTarget] = useState<AdminPayment | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   // Trial Config State
-  const [trialDays, setTrialDays] = useState('14');
-  const [paymentInstructions, setPaymentInstructions] = useState('');
+  const [trialDays, setTrialDays] = useState('7');
+  const [paymentInstructions, setPaymentInstructions] = useState(
+    'Easypaisa: 0329-5931738 | JazzCash: 0329-5931738 (Dastarkhwan Admin — Send payment and enter your Transaction ID below)'
+  );
 
-  const { data, isLoading } = useQuery<AdminSubscriptionOverview>({
+  const { data, isLoading, isError, refetch } = useQuery<AdminSubscriptionOverview>({
     queryKey: ['admin', 'subscriptions'],
     refetchInterval: 8000,
     queryFn: () => adminHttpClient.get<AdminSubscriptionOverview>('/admin/subscriptions/overview'),
@@ -118,21 +135,25 @@ export const SubscriptionsPage: React.FC = () => {
 
   useEffect(() => {
     if (data?.trialConfig) {
-      setTrialDays(String(data.trialConfig.defaultTrialDays));
-      setPaymentInstructions(data.trialConfig.paymentInstructions);
+      setTrialDays(String(data.trialConfig.defaultTrialDays ?? 7));
+      setPaymentInstructions(data.trialConfig.paymentInstructions ?? '');
     }
   }, [data?.trialConfig]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
 
+  const packages = data?.packages ?? [];
+  const vendorSubs = data?.vendorSubscriptions ?? data?.subscriptions ?? [];
+  const payments = data?.payments ?? [];
+
   const openCreatePkg = () => {
     setEditingPkg(null);
     setPkgName('');
     setPkgDesc('');
-    setPkgMonthlyPkr('4999');
-    setPkgYearlyPkr('49990');
+    setPkgMonthlyPkr('4900');
+    setPkgYearlyPkr('49000');
     setPkgFeatures('Full Menu & Order Management\nCustomer Mobile App Listing\nReal-time Analytics');
-    setPkgOrder(String((data?.packages.length ?? 0) + 1));
+    setPkgOrder(String(packages.length + 1));
     setPkgModalOpen(true);
   };
 
@@ -142,9 +163,42 @@ export const SubscriptionsPage: React.FC = () => {
     setPkgDesc(pkg.description);
     setPkgMonthlyPkr(String(Math.round(pkg.monthlyPriceMinor / 100)));
     setPkgYearlyPkr(String(Math.round(pkg.yearlyPriceMinor / 100)));
-    setPkgFeatures(pkg.features.join('\n'));
+    setPkgFeatures((pkg.features ?? []).join('\n'));
     setPkgOrder(String(pkg.sortOrder));
     setPkgModalOpen(true);
+  };
+
+  const openManageVendor = (v: AdminVendorSub) => {
+    setManageTarget(v);
+    setManagePkgId(v.packageId ?? packages[0]?.id ?? '');
+    setManageStatus(v.status === 'pending_payment' ? 'active' : v.status);
+    setManageCycle(
+      v.billingCycle === 'yearly' ? 'yearly' : v.billingCycle === 'trial' ? 'trial' : 'monthly'
+    );
+    setManageDays('30');
+    setManageExactDate('');
+  };
+
+  const handleSaveVendorControl = async (override?: Record<string, unknown>, toastLabel?: string) => {
+    if (!manageTarget) return;
+    try {
+      const payload = override ?? {
+        packageId: managePkgId || undefined,
+        status: manageStatus,
+        billingCycle: manageCycle,
+        ...(manageExactDate
+          ? { expiresAt: new Date(manageExactDate).toISOString() }
+          : manageDays && Number(manageDays) > 0
+            ? { setDaysFromNow: Number(manageDays) }
+            : {}),
+      };
+      await adminHttpClient.patch(`/admin/vendor-subscriptions/${manageTarget.restaurantId}`, payload);
+      setManageTarget(null);
+      await refresh();
+      showToast(toastLabel ?? `Updated subscription for ${manageTarget.restaurantName}`);
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to update subscription');
+    }
   };
 
   const handleSavePackage = async () => {
@@ -226,9 +280,9 @@ export const SubscriptionsPage: React.FC = () => {
     }
   };
 
-  const handleVendorAction = async (
+  const handleVendorQuickAction = async (
     vendor: AdminVendorSub,
-    payload: { status?: string; extendDays?: number },
+    payload: Record<string, unknown>,
     label: string
   ) => {
     try {
@@ -243,7 +297,7 @@ export const SubscriptionsPage: React.FC = () => {
   const handleSaveConfig = async () => {
     try {
       await adminHttpClient.patch('/admin/subscription-config', {
-        defaultTrialDays: Math.max(1, Math.min(90, Number(trialDays) || 14)),
+        defaultTrialDays: Math.max(1, Math.min(365, Number(trialDays) || 7)),
         paymentInstructions: paymentInstructions.trim(),
       });
       await refresh();
@@ -253,23 +307,35 @@ export const SubscriptionsPage: React.FC = () => {
     }
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="zr-card" style={{ padding: 28 }}>Loading SaaS subscriptions overview...</div>;
   }
 
+  if (isError || !data) {
+    return (
+      <div className="zr-card" style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontWeight: 800, color: '#DC2626' }}>Could not load SaaS Subscriptions data.</div>
+        <div>
+          <PrimaryButton onClick={() => void refetch()}>Retry</PrimaryButton>
+        </div>
+      </div>
+    );
+  }
+
   const m = data.metrics;
+  const pendingCount = m.pendingPaymentsCount ?? m.pendingPayments ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Executive KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: 14 }}>
         {[
-          { label: 'Active Paid Vendors', value: String(m.activeVendors), color: '#16A34A' },
-          { label: 'Free Trial Vendors', value: String(m.trialVendors), color: '#2563EB' },
-          { label: 'Expired / Restricted', value: String(m.expiredVendors), color: '#DC2626' },
-          { label: 'Pending Payments', value: String(m.pendingPaymentsCount), color: '#D97706' },
-          { label: 'Monthly Sub Revenue', value: formatMoney(m.monthlyRevenueMinor), color: '#F47B20' },
-          { label: 'Yearly Sub Revenue', value: formatMoney(m.yearlyRevenueMinor), color: '#7C3AED' },
+          { label: 'Active Paid Vendors', value: String(m.activeVendors ?? 0), color: '#16A34A' },
+          { label: 'Free Trial Vendors', value: String(m.trialVendors ?? 0), color: '#2563EB' },
+          { label: 'Expired / Restricted', value: String(m.expiredVendors ?? 0), color: '#DC2626' },
+          { label: 'Pending Payments', value: String(pendingCount), color: '#D97706' },
+          { label: 'Monthly Sub Revenue', value: formatMoney(m.monthlyRevenueMinor ?? 0), color: '#F47B20' },
+          { label: 'Yearly Sub Revenue', value: formatMoney(m.yearlyRevenueMinor ?? 0), color: '#7C3AED' },
         ].map((card) => (
           <div key={card.label} className="zr-card" style={{ padding: 18 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--zr-text-secondary)', textTransform: 'uppercase' }}>
@@ -283,24 +349,154 @@ export const SubscriptionsPage: React.FC = () => {
       {/* Section Tabs */}
       <Tabs
         items={[
-          { key: 'payments', label: `Payment Verification (${m.pendingPaymentsCount})` },
-          { key: 'vendors', label: `Vendor Subscriptions (${data.vendorSubscriptions.length})` },
-          { key: 'packages', label: `Packages (${data.packages.length})` },
+          { key: 'vendors', label: `Vendor Subscriptions (${vendorSubs.length})` },
+          { key: 'payments', label: `Payment Verification (${pendingCount})` },
+          { key: 'packages', label: `Packages (${packages.length})` },
           { key: 'config', label: 'Trial & Payment Config' },
         ]}
         activeKey={tab}
-        onChange={(k) => setTab(k as 'payments' | 'vendors' | 'packages' | 'config')}
+        onChange={(k) => setTab(k as 'vendors' | 'payments' | 'packages' | 'config')}
       />
 
-      {/* TAB 1: PAYMENT VERIFICATION */}
+      {/* TAB 1: VENDOR SUBSCRIPTIONS (FULL DIRECT SUPER ADMIN CONTROL) */}
+      {tab === 'vendors' ? (
+        <div className="zr-card" style={{ padding: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+              All Restaurant Vendor Subscriptions — Direct Super Admin Control
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--zr-text-secondary)' }}>
+              Freely grant/renew subscriptions for friends & partners, change plans, extend days, suspend, or end any subscription immediately.
+            </p>
+          </div>
+          {vendorSubs.length === 0 ? (
+            <EmptyState
+              title="No restaurants found"
+              description="Registered restaurants will automatically start on a 7-day free trial."
+            />
+          ) : (
+            <DataTable<AdminVendorSub>
+              data={vendorSubs}
+              rowKey={(r) => r.id}
+              columns={[
+                {
+                  key: 'restaurantName',
+                  header: 'Restaurant & Owner',
+                  render: (r) => (
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{r.restaurantName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
+                        {r.ownerName} · {r.ownerEmail}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'packageName',
+                  header: 'Plan',
+                  render: (r) => (
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{r.packageName}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)', textTransform: 'capitalize' }}>
+                        {r.billingCycle}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (r) => (
+                    <StatusBadge
+                      label={r.status.replace('_', ' ').toUpperCase()}
+                      tone={
+                        r.status === 'active'
+                          ? 'success'
+                          : r.status === 'trial'
+                            ? 'info'
+                            : r.status === 'pending_payment'
+                              ? 'warning'
+                              : 'error'
+                      }
+                    />
+                  ),
+                },
+                {
+                  key: 'remainingDays',
+                  header: 'Remaining / Expiry',
+                  render: (r) => (
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{r.remainingDays} days left</div>
+                      <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
+                        {r.expiresAt ? new Date(r.expiresAt).toLocaleDateString() : '—'}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'controls',
+                  header: 'Direct Admin Controls',
+                  render: (r) => (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <PrimaryButton
+                        leftIcon={<SlidersHorizontal size={13} />}
+                        onClick={() => openManageVendor(r)}
+                      >
+                        Full Control
+                      </PrimaryButton>
+                      <SecondaryButton
+                        leftIcon={<Gift size={13} />}
+                        onClick={() =>
+                          void handleVendorQuickAction(
+                            r,
+                            { grantFreeAccess: true, extendDays: 30 },
+                            'Granted +30 days free access'
+                          )
+                        }
+                      >
+                        +30d Free
+                      </SecondaryButton>
+                      {r.status !== 'expired' ? (
+                        <SecondaryButton
+                          leftIcon={<Ban size={13} />}
+                          onClick={() =>
+                            void handleVendorQuickAction(r, { endImmediately: true }, 'Subscription ended immediately')
+                          }
+                        >
+                          End Now
+                        </SecondaryButton>
+                      ) : null}
+                      {r.status !== 'suspended' ? (
+                        <SecondaryButton
+                          leftIcon={<ShieldAlert size={13} />}
+                          onClick={() =>
+                            void handleVendorQuickAction(r, { status: 'suspended' }, 'Suspended')
+                          }
+                        >
+                          Suspend
+                        </SecondaryButton>
+                      ) : null}
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </div>
+      ) : null}
+
+      {/* TAB 2: PAYMENT VERIFICATION */}
       {tab === 'payments' ? (
         <div className="zr-card" style={{ padding: 20 }}>
           <h3 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 800 }}>Vendor Payment Submissions</h3>
-          {data.payments.length === 0 ? (
-            <EmptyState title="No subscription payments submitted yet" description="Payments submitted by restaurant vendors will appear here for verification." />
+          {payments.length === 0 ? (
+            <EmptyState
+              title="No subscription payments submitted yet"
+              description="Payments sent to Easypaisa/JazzCash 0329-5931738 by restaurant vendors will appear here for verification."
+            />
           ) : (
             <DataTable<AdminPayment>
-              data={data.payments}
+              data={payments}
               rowKey={(r) => r.id}
               columns={[
                 { key: 'restaurantName', header: 'Restaurant', render: (r) => <strong>{r.restaurantName}</strong> },
@@ -321,19 +517,22 @@ export const SubscriptionsPage: React.FC = () => {
                 {
                   key: 'transactionRef',
                   header: 'Reference & Method',
-                  render: (r) => (
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{r.transactionRef}</div>
-                      <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
-                        {r.paymentMethod.toUpperCase()} {r.senderAccount ? `· ${r.senderAccount}` : ''}
+                  render: (r) => {
+                    const proof = r.proofUrl || r.proofImageUrl;
+                    return (
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{r.transactionRef}</div>
+                        <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
+                          {r.paymentMethod.toUpperCase()} {r.senderAccount ? `· ${r.senderAccount}` : ''}
+                        </div>
+                        {proof ? (
+                          <a href={proof} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--zr-primary)' }}>
+                            View Receipt
+                          </a>
+                        ) : null}
                       </div>
-                      {r.proofUrl ? (
-                        <a href={r.proofUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--zr-primary)' }}>
-                          View Receipt
-                        </a>
-                      ) : null}
-                    </div>
-                  ),
+                    );
+                  },
                 },
                 {
                   key: 'status',
@@ -376,96 +575,6 @@ export const SubscriptionsPage: React.FC = () => {
         </div>
       ) : null}
 
-      {/* TAB 2: VENDOR SUBSCRIPTIONS */}
-      {tab === 'vendors' ? (
-        <div className="zr-card" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 800 }}>All Restaurant Vendor Subscriptions</h3>
-          {data.vendorSubscriptions.length === 0 ? (
-            <EmptyState title="No restaurants found" description="Registered restaurants will automatically start on a free trial." />
-          ) : (
-            <DataTable<AdminVendorSub>
-              data={data.vendorSubscriptions}
-              rowKey={(r) => r.id}
-              columns={[
-                {
-                  key: 'restaurantName',
-                  header: 'Restaurant & Owner',
-                  render: (r) => (
-                    <div>
-                      <div style={{ fontWeight: 800 }}>{r.restaurantName}</div>
-                      <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
-                        {r.ownerName} · {r.ownerEmail}
-                      </div>
-                    </div>
-                  ),
-                },
-                { key: 'packageName', header: 'Plan', render: (r) => <span>{r.packageName}</span> },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  render: (r) => (
-                    <StatusBadge
-                      label={r.status.replace('_', ' ').toUpperCase()}
-                      tone={
-                        r.status === 'active'
-                          ? 'success'
-                          : r.status === 'trial'
-                            ? 'info'
-                            : r.status === 'pending_payment'
-                              ? 'warning'
-                              : 'error'
-                      }
-                    />
-                  ),
-                },
-                {
-                  key: 'remainingDays',
-                  header: 'Remaining / Expiry',
-                  render: (r) => (
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{r.remainingDays} days left</div>
-                      <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
-                        {r.expiresAt ? new Date(r.expiresAt).toLocaleDateString() : '—'}
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'controls',
-                  header: 'Super Admin Controls',
-                  render: (r) => (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <SecondaryButton
-                        leftIcon={<Clock size={13} />}
-                        onClick={() => void handleVendorAction(r, { extendDays: 30 }, 'Extended by +30 days')}
-                      >
-                        +30d
-                      </SecondaryButton>
-                      {r.status !== 'active' ? (
-                        <PrimaryButton
-                          leftIcon={<Crown size={13} />}
-                          onClick={() => void handleVendorAction(r, { status: 'active', extendDays: 30 }, 'Activated')}
-                        >
-                          Activate
-                        </PrimaryButton>
-                      ) : null}
-                      {r.status !== 'suspended' ? (
-                        <SecondaryButton
-                          leftIcon={<ShieldAlert size={13} />}
-                          onClick={() => void handleVendorAction(r, { status: 'suspended' }, 'Suspended')}
-                        >
-                          Suspend
-                        </SecondaryButton>
-                      ) : null}
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          )}
-        </div>
-      ) : null}
-
       {/* TAB 3: PACKAGES CRUD */}
       {tab === 'packages' ? (
         <div className="zr-card" style={{ padding: 20 }}>
@@ -482,7 +591,7 @@ export const SubscriptionsPage: React.FC = () => {
           </div>
 
           <DataTable<AdminPackage>
-            data={data.packages}
+            data={packages}
             rowKey={(r) => r.id}
             columns={[
               {
@@ -508,7 +617,7 @@ export const SubscriptionsPage: React.FC = () => {
               {
                 key: 'features',
                 header: 'Features',
-                render: (r) => <span>{r.features.length} included</span>,
+                render: (r) => <span>{(r.features ?? []).length} included</span>,
               },
               {
                 key: 'isActive',
@@ -543,9 +652,9 @@ export const SubscriptionsPage: React.FC = () => {
       {tab === 'config' ? (
         <div className="zr-card" style={{ padding: 24, maxWidth: 680, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Free Trial & Payment Instructions</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Free Trial & Payment Account Settings</h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--zr-text-secondary)' }}>
-              Configure the automatic free trial length for new restaurant registrations and the payment account details shown to vendors.
+              Default Free Trial is 7 days. Easypaisa & JazzCash number: <strong>0329-5931738</strong>.
             </p>
           </div>
 
@@ -557,7 +666,7 @@ export const SubscriptionsPage: React.FC = () => {
           />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 700 }}>Vendor Payment Instructions</label>
+            <label style={{ fontSize: 13, fontWeight: 700 }}>Vendor Payment Instructions (Easypaisa / JazzCash / Bank)</label>
             <textarea
               rows={4}
               value={paymentInstructions}
@@ -581,6 +690,125 @@ export const SubscriptionsPage: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {/* FULL DIRECT SUPER ADMIN VENDOR SUBSCRIPTION CONTROL MODAL */}
+      <Modal
+        open={Boolean(manageTarget)}
+        title={manageTarget ? `Manage Subscription — ${manageTarget.restaurantName}` : ''}
+        onClose={() => setManageTarget(null)}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setManageTarget(null)}>Cancel</SecondaryButton>
+            <SecondaryButton
+              leftIcon={<Ban size={14} />}
+              onClick={() =>
+                void handleSaveVendorControl({ endImmediately: true }, `Ended subscription for ${manageTarget?.restaurantName}`)
+              }
+            >
+              End Immediately
+            </SecondaryButton>
+            <PrimaryButton leftIcon={<Crown size={14} />} onClick={() => void handleSaveVendorControl()}>
+              Save Changes
+            </PrimaryButton>
+          </>
+        }
+      >
+        {manageTarget ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Quick Free Friend / Partner Presets */}
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 12,
+                background: 'var(--zr-surface-alt)',
+                border: '1px solid var(--zr-border)',
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8, color: 'var(--zr-primary)' }}>
+                1-CLICK FREE RENEWAL / FRIEND ACCESS (NO PAYMENT REQUIRED)
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  { label: '+7d Free', days: 7, cycle: 'trial' },
+                  { label: '+30d (1 Mo Free)', days: 30, cycle: 'monthly' },
+                  { label: '+90d (3 Mo Free)', days: 90, cycle: 'monthly' },
+                  { label: '+365d (1 Yr Free)', days: 365, cycle: 'yearly' },
+                  { label: 'Lifetime Free (10 Yrs)', days: 3650, cycle: 'yearly' },
+                ].map((preset) => (
+                  <SecondaryButton
+                    key={preset.label}
+                    leftIcon={<Gift size={12} />}
+                    onClick={() =>
+                      void handleSaveVendorControl(
+                        {
+                          packageId: managePkgId || undefined,
+                          status: 'active',
+                          billingCycle: preset.cycle,
+                          grantFreeAccess: true,
+                          setDaysFromNow: preset.days,
+                        },
+                        `Granted ${preset.label} to ${manageTarget.restaurantName}!`
+                      )
+                    }
+                  >
+                    {preset.label}
+                  </SecondaryButton>
+                ))}
+              </div>
+            </div>
+
+            <Dropdown
+              label="Assigned Subscription Package"
+              value={managePkgId}
+              onChange={setManagePkgId}
+              options={packages.map((p) => ({ label: p.name, value: p.id }))}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Dropdown
+                label="Subscription Status"
+                value={manageStatus}
+                onChange={(v) => setManageStatus(v as 'active' | 'trial' | 'expired' | 'suspended')}
+                options={[
+                  { label: 'Active (Full Access)', value: 'active' },
+                  { label: 'Free Trial', value: 'trial' },
+                  { label: 'Expired (Locked)', value: 'expired' },
+                  { label: 'Suspended', value: 'suspended' },
+                ]}
+              />
+              <Dropdown
+                label="Billing Cycle"
+                value={manageCycle}
+                onChange={(v) => setManageCycle(v as 'monthly' | 'yearly' | 'trial')}
+                options={[
+                  { label: 'Monthly', value: 'monthly' },
+                  { label: 'Yearly', value: 'yearly' },
+                  { label: 'Trial', value: 'trial' },
+                ]}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <InputField
+                label="Set Active Days From Today"
+                type="number"
+                value={manageDays}
+                onChange={(e) => {
+                  setManageDays(e.target.value);
+                  setManageExactDate('');
+                }}
+                placeholder="e.g. 30, 365"
+              />
+              <InputField
+                label="OR Exact Expiry Date"
+                type="date"
+                value={manageExactDate}
+                onChange={(e) => setManageExactDate(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       {/* Create/Edit Package Modal */}
       <Modal
@@ -636,7 +864,7 @@ export const SubscriptionsPage: React.FC = () => {
       >
         <InputField
           label="Rejection Reason (shown to restaurant vendor)"
-          placeholder="e.g. Transaction reference not found in JazzCash statement"
+          placeholder="e.g. Transaction reference not found in JazzCash/Easypaisa statement"
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
         />

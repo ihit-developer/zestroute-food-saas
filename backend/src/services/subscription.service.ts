@@ -76,11 +76,14 @@ export class SubscriptionService {
 
   static async getTrialConfig() {
     const cfg = await AppSettingModel.findOne({ key: 'platform_config' }).lean();
+    const rawInstructions = cfg?.subscriptionPaymentInstructions;
+    const isOldPlaceholder =
+      !rawInstructions || rawInstructions.includes('0300-1234567') || rawInstructions.includes('0345-1234567');
     return {
-      defaultTrialDays: cfg?.defaultTrialDays ?? 14,
-      paymentInstructions:
-        cfg?.subscriptionPaymentInstructions ??
-        'JazzCash: 0300-1234567 | Easypaisa: 0345-1234567 | Bank IBAN: PK36DAST00001234567890 (Dastarkhwan Pvt Ltd)',
+      defaultTrialDays: cfg?.defaultTrialDays ?? 7,
+      paymentInstructions: isOldPlaceholder
+        ? 'Easypaisa: 0329-5931738 | JazzCash: 0329-5931738 (Dastarkhwan Admin — Send payment and enter your Transaction ID below)'
+        : rawInstructions,
     };
   }
 
@@ -253,6 +256,8 @@ export class SubscriptionService {
           !statusInfo.isAccessAllowed && pendingPayment ? 'pending_payment' : statusInfo.status,
       },
       trialConfig,
+      defaultTrialDays: trialConfig.defaultTrialDays,
+      paymentInstructions: trialConfig.paymentInstructions,
       packages: packages.map((p) => ({
         id: String(p._id),
         name: p.name,
@@ -263,6 +268,7 @@ export class SubscriptionService {
         features: p.features ?? [],
         isActive: p.isActive,
         trialEligible: p.trialEligible,
+        isTrialEligible: p.trialEligible,
         sortOrder: p.sortOrder,
       })),
       payments: payments.map((p) => ({
@@ -275,6 +281,7 @@ export class SubscriptionService {
         senderAccount: p.senderAccount,
         transactionRef: p.transactionRef,
         proofImageUrl: p.proofImageUrl ?? '',
+        proofUrl: p.proofImageUrl ?? '',
         status: p.status,
         rejectionReason: p.rejectionReason ?? '',
         createdAt: String(p.createdAt),
@@ -291,9 +298,10 @@ export class SubscriptionService {
       packageId: string;
       billingCycle: 'monthly' | 'yearly';
       paymentMethod: 'jazzcash' | 'easypaisa' | 'bank_transfer' | 'card';
-      senderAccount: string;
+      senderAccount?: string;
       transactionRef: string;
       proofImageUrl?: string;
+      proofUrl?: string;
       notes?: string;
     }
   ) {
@@ -304,11 +312,9 @@ export class SubscriptionService {
     if (!pkg) {
       throw new AppError(404, 'PACKAGE_NOT_FOUND', 'Subscription package not found or inactive');
     }
-    if (!input.senderAccount?.trim() || input.senderAccount.trim().length < 4) {
-      throw new AppError(400, 'INVALID_SENDER', 'Enter your sender mobile/bank account');
-    }
-    if (!input.transactionRef?.trim() || input.transactionRef.trim().length < 5) {
-      throw new AppError(400, 'INVALID_TXN_REF', 'Enter a valid Transaction Reference / TID (min 5 chars)');
+    const resolvedSender = input.senderAccount?.trim() || 'Provided via TID';
+    if (!input.transactionRef?.trim() || input.transactionRef.trim().length < 4) {
+      throw new AppError(400, 'INVALID_TXN_REF', 'Enter a valid Transaction Reference / TID (min 4 chars)');
     }
 
     const dup = await SubscriptionPaymentModel.findOne({
@@ -336,9 +342,9 @@ export class SubscriptionService {
       amountMinor,
       currency: 'PKR',
       paymentMethod: input.paymentMethod,
-      senderAccount: input.senderAccount.trim(),
+      senderAccount: resolvedSender,
       transactionRef: input.transactionRef.trim(),
-      proofImageUrl: input.proofImageUrl?.trim() || undefined,
+      proofImageUrl: (input.proofImageUrl || input.proofUrl)?.trim() || undefined,
       notes: input.notes?.trim() || undefined,
       status: 'pending',
     });
@@ -451,7 +457,7 @@ export class SubscriptionService {
       await this.evaluateRestaurantSubscription(String(r._id)).catch(() => {});
     }
 
-    const [subs, payments, trialConfig] = await Promise.all([
+    const [subs, payments, trialConfig, packages] = await Promise.all([
       VendorSubscriptionModel.find()
         .populate('restaurantId', 'name status')
         .populate('ownerId', 'fullName email phone')
@@ -466,6 +472,7 @@ export class SubscriptionService {
         .limit(100)
         .lean(),
       this.getTrialConfig(),
+      this.listAllPackages(),
     ]);
 
     const now = new Date();
@@ -476,6 +483,7 @@ export class SubscriptionService {
       const exp =
         s.status === 'trial' && s.trialEndsAt ? new Date(s.trialEndsAt) : new Date(s.currentPeriodEnd);
       const remainingDays = Math.max(0, Math.ceil((exp.getTime() - now.getTime()) / MS_PER_DAY));
+      const isAccessAllowed = (s.status === 'trial' || s.status === 'active') && exp > now;
       return {
         id: String(s._id),
         restaurantId: String(rest?._id ?? s.restaurantId),
@@ -486,6 +494,7 @@ export class SubscriptionService {
         packageName: pkg?.name ?? (s.status === 'trial' ? 'Free Trial' : 'Standard'),
         billingCycle: s.billingCycle,
         status: s.status,
+        isAccessAllowed,
         startsAt: String(s.currentPeriodStart),
         expiresAt: exp.toISOString(),
         remainingDays,
@@ -493,11 +502,12 @@ export class SubscriptionService {
     });
 
     const formattedPayments = payments.map((p) => {
-      const rest = p.restaurantId as unknown as { name?: string } | null;
+      const rest = p.restaurantId as unknown as { _id?: unknown; name?: string } | null;
       const owner = p.ownerId as unknown as { fullName?: string; email?: string } | null;
       const pkg = p.packageId as unknown as { name?: string } | null;
       return {
         id: String(p._id),
+        restaurantId: String(rest?._id ?? p.restaurantId),
         restaurantName: rest?.name ?? 'Restaurant',
         ownerName: owner?.fullName ?? 'Partner',
         ownerEmail: owner?.email ?? '',
@@ -508,6 +518,8 @@ export class SubscriptionService {
         senderAccount: p.senderAccount,
         transactionRef: p.transactionRef,
         proofImageUrl: p.proofImageUrl ?? '',
+        proofUrl: p.proofImageUrl ?? '',
+        notes: p.notes ?? '',
         status: p.status,
         rejectionReason: p.rejectionReason ?? '',
         createdAt: String(p.createdAt),
@@ -515,6 +527,7 @@ export class SubscriptionService {
     });
 
     const approvedPayments = formattedPayments.filter((p) => p.status === 'approved');
+    const pendingPaymentsCount = formattedPayments.filter((p) => p.status === 'pending').length;
     const monthlyRevenueMinor = approvedPayments
       .filter((p) => p.billingCycle === 'monthly')
       .reduce((sum, p) => sum + p.amountMinor, 0);
@@ -527,16 +540,22 @@ export class SubscriptionService {
         totalVendors: formattedSubs.length,
         activeVendors: formattedSubs.filter((s) => s.status === 'active').length,
         trialVendors: formattedSubs.filter((s) => s.status === 'trial').length,
-        expiredVendors: formattedSubs.filter((s) => s.status === 'expired' || s.status === 'pending_payment').length,
+        expiredVendors: formattedSubs.filter(
+          (s) => s.status === 'expired' || s.status === 'pending_payment' || s.status === 'suspended'
+        ).length,
         suspendedVendors: formattedSubs.filter((s) => s.status === 'suspended').length,
-        pendingPayments: formattedPayments.filter((p) => p.status === 'pending').length,
+        pendingPayments: pendingPaymentsCount,
+        pendingPaymentsCount,
         approvedPayments: approvedPayments.length,
         rejectedPayments: formattedPayments.filter((p) => p.status === 'rejected').length,
         monthlyRevenueMinor,
         yearlyRevenueMinor,
+        totalRevenueMinor: monthlyRevenueMinor + yearlyRevenueMinor,
         totalSubscriptionRevenueMinor: monthlyRevenueMinor + yearlyRevenueMinor,
       },
       trialConfig,
+      packages,
+      vendorSubscriptions: formattedSubs,
       subscriptions: formattedSubs,
       payments: formattedPayments,
       upcomingExpirations: formattedSubs.filter(
@@ -612,14 +631,18 @@ export class SubscriptionService {
     return { payment: payment.toObject(), subscription: sub.toObject() };
   }
 
-  /** Super Admin manually extends, activates, or suspends a vendor subscription */
+  /** Super Admin full direct control: assign plan, renew freely for friends, set exact expiry, suspend, or end immediately */
   static async adminUpdateVendorSubscription(
     restaurantId: string,
     input: {
-      status?: 'trial' | 'active' | 'expired' | 'suspended';
+      status?: 'trial' | 'active' | 'pending_payment' | 'expired' | 'suspended';
       extendDays?: number;
+      setDaysFromNow?: number;
+      expiresAt?: string;
       packageId?: string;
       billingCycle?: 'trial' | 'monthly' | 'yearly';
+      endImmediately?: boolean;
+      grantFreeAccess?: boolean;
     }
   ) {
     const sub = await this.ensureTrialForRestaurant(restaurantId);
@@ -632,23 +655,67 @@ export class SubscriptionService {
     if (input.billingCycle) {
       sub.billingCycle = input.billingCycle;
     }
-    if (typeof input.extendDays === 'number' && input.extendDays > 0) {
-      const base = new Date(sub.currentPeriodEnd) > now ? new Date(sub.currentPeriodEnd) : now;
+
+    if (input.endImmediately || input.status === 'expired') {
+      const past = new Date(now.getTime() - 1000);
+      sub.status = 'expired';
+      sub.currentPeriodEnd = past;
+      if (sub.trialEndsAt) sub.trialEndsAt = past;
+      await sub.save();
+      return sub.toObject();
+    }
+
+    if (input.expiresAt) {
+      const customEnd = new Date(input.expiresAt);
+      if (!Number.isNaN(customEnd.getTime())) {
+        sub.currentPeriodEnd = customEnd;
+        if (input.status === 'trial' || sub.status === 'trial') {
+          sub.trialEndsAt = customEnd;
+        }
+      }
+    } else if (typeof input.setDaysFromNow === 'number' && input.setDaysFromNow > 0) {
+      const nextEnd = new Date(now.getTime() + input.setDaysFromNow * MS_PER_DAY);
+      sub.currentPeriodStart = now;
+      sub.currentPeriodEnd = nextEnd;
+      if (input.status === 'trial' || sub.status === 'trial') {
+        sub.trialEndsAt = nextEnd;
+      }
+    } else if (typeof input.extendDays === 'number' && input.extendDays > 0) {
+      const currentExp =
+        sub.status === 'trial' && sub.trialEndsAt ? new Date(sub.trialEndsAt) : new Date(sub.currentPeriodEnd);
+      const base = currentExp > now ? currentExp : now;
       const nextEnd = new Date(base.getTime() + input.extendDays * MS_PER_DAY);
       sub.currentPeriodEnd = nextEnd;
-      if (sub.status === 'trial') sub.trialEndsAt = nextEnd;
-      if (sub.status === 'expired' || sub.status === 'pending_payment') {
+      if (sub.status === 'trial' && input.status !== 'active') {
+        sub.trialEndsAt = nextEnd;
+      }
+      if (sub.status === 'expired' || sub.status === 'pending_payment' || sub.status === 'suspended') {
         sub.status = 'active';
       }
     }
-    if (input.status) {
+
+    if (input.grantFreeAccess) {
+      sub.status = 'active';
+      if (sub.billingCycle === 'trial') sub.billingCycle = 'monthly';
+      if (new Date(sub.currentPeriodEnd) <= now) {
+        sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
+      }
+    } else if (input.status) {
       sub.status = input.status;
-      if (input.status === 'expired') {
-        const past = new Date(now.getTime() - 1000);
-        sub.currentPeriodEnd = past;
-        if (sub.trialEndsAt) sub.trialEndsAt = past;
+      if (input.status === 'active' && new Date(sub.currentPeriodEnd) <= now) {
+        sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
+      }
+      if (input.status === 'trial') {
+        const { defaultTrialDays } = await this.getTrialConfig();
+        if (!sub.trialEndsAt || new Date(sub.trialEndsAt) <= now) {
+          const tEnd = new Date(now.getTime() + defaultTrialDays * MS_PER_DAY);
+          sub.trialStartsAt = now;
+          sub.trialEndsAt = tEnd;
+          sub.currentPeriodEnd = tEnd;
+        }
       }
     }
+
     await sub.save();
     return sub.toObject();
   }
