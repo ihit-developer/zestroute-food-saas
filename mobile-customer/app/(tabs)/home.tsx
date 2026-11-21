@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowRight,
   Bell,
   CheckCircle2,
   ChevronDown,
@@ -16,13 +15,12 @@ import {
   Store,
   User,
 } from 'lucide-react-native';
-import type { FoodCardData, RestaurantCardData } from '@zestroute/shared';
+import type { RestaurantCardData } from '@zestroute/shared';
 import { useTheme } from '../../hooks/useTheme';
 import {
   ConfirmationDialog,
   EmptyState,
   ErrorState,
-  FoodCard,
   IconButton,
   LoadingSkeleton,
   RestaurantCard,
@@ -48,7 +46,6 @@ export default function HomeScreen() {
   const setSession = useAppStore((s) => s.setSession);
   const activeRestaurant = useAppStore((s) => s.activeRestaurant);
   const switchActiveRestaurant = useAppStore((s) => s.switchActiveRestaurant);
-  const addToCart = useAppStore((s) => s.addToCart);
   const cartRestaurantName = useAppStore((s) => s.cartRestaurantName);
   const cartCount = useAppStore((s) => s.cartItems.reduce((acc, i) => acc + i.quantity, 0));
 
@@ -57,11 +54,9 @@ export default function HomeScreen() {
   const { data: notifications } = useNotifications();
   const unreadNotifCount = notifications.filter((n) => !n.isRead).length;
 
-  const favFoodIds = useMemo(() => new Set(favData.foods.map((f) => f.id)), [favData.foods]);
   const favRestIds = useMemo(() => new Set(favData.restaurants.map((r) => r.id)), [favData.restaurants]);
 
   const isMultiRestaurant = data.popularRestaurants.length > 1;
-  const singleRestaurant = data.popularRestaurants[0];
 
   const toggleFavorite = async (targetType: 'food' | 'restaurant', targetId: string) => {
     if (!isAuthenticated) {
@@ -113,21 +108,6 @@ export default function HomeScreen() {
     router.replace('/(auth)/welcome');
   };
 
-  const handleQuickAdd = (food: FoodCardData) => {
-    const restName = food.restaurantName ?? activeRestaurant?.name ?? singleRestaurant?.name ?? 'Restaurant';
-    const status = addToCart(food.restaurantId, restName, {
-      id: `${food.id}-base`,
-      foodId: food.id,
-      name: food.name,
-      unitPriceMinor: food.discountPriceMinor ?? food.regularPriceMinor,
-      quantity: 1,
-      customizations: [],
-    });
-    if (status === 'added') {
-      showToast(`${food.name} added to ${restName} cart`, 'success');
-    }
-  };
-
   const q = search.trim().toLowerCase();
 
   const filteredRestaurants = useMemo(
@@ -142,21 +122,6 @@ export default function HomeScreen() {
       }),
     [data.popularRestaurants, q]
   );
-
-  // Scoped dishes for active restaurant (or single restaurant)
-  const activeFoods = useMemo(() => {
-    const targetRestId = activeRestaurant?.id ?? (!isMultiRestaurant ? singleRestaurant?.id : null);
-    if (!targetRestId) return [];
-    const map = new Map<string, FoodCardData>();
-    for (const f of [...data.bestSellingFoods, ...data.recommendedFoods, ...data.trendingFoods]) {
-      if (f.restaurantId !== targetRestId) continue;
-      if (!map.has(f.id)) map.set(f.id, f);
-    }
-    return Array.from(map.values()).filter((f) => {
-      if (!q) return true;
-      return f.name.toLowerCase().includes(q) || (f.description ?? '').toLowerCase().includes(q);
-    });
-  }, [data, activeRestaurant?.id, isMultiRestaurant, singleRestaurant?.id, q]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
@@ -239,18 +204,10 @@ export default function HomeScreen() {
               </Text>
             </View>
             <Text style={styles.heroTitle}>
-              {activeRestaurant
-                ? `${activeRestaurant.name} Kitchen`
-                : isMultiRestaurant
-                  ? 'Choose One Restaurant to Order'
-                  : `${singleRestaurant?.name ?? 'Fresh Kitchen'} Menu`}
+              Choose Your Restaurant
             </Text>
             <Text style={styles.heroSub}>
-              {activeRestaurant
-                ? 'Your menu & Explore tab are locked to this kitchen. Switch anytime with 1 tap.'
-                : isMultiRestaurant
-                  ? 'Pick your favorite restaurant below — only its food will appear while ordering.'
-                  : `${singleRestaurant?.locationLabel ?? 'Lahore'} · Delivered hot in 20–30 mins`}
+              Pick a restaurant below to browse its fresh menu and place your order.
             </Text>
           </View>
           <View style={styles.heroIcon}>
@@ -262,13 +219,7 @@ export default function HomeScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder={
-            activeRestaurant
-              ? `Search ${activeRestaurant.name} dishes...`
-              : isMultiRestaurant
-                ? 'Search restaurants (Pizza Box, Cheezious...)'
-                : 'Search burgers, pizza, drinks...'
-          }
+          placeholder="Search restaurants (Pizza Box, Cheezious...)"
         />
 
         {isLoading ? (
@@ -278,112 +229,62 @@ export default function HomeScreen() {
           </View>
         ) : isError ? (
           <ErrorState message="Could not load restaurants." onRetry={() => void refetch()} />
-        ) : isMultiRestaurant ? (
-          <>
-            {/* If a Restaurant is Active, Show Quick-Order Popular Dishes ONLY from That Restaurant */}
-            {activeRestaurant && activeFoods.length > 0 ? (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                    Popular at {activeRestaurant.name}
-                  </Text>
-                  <Pressable
-                    onPress={() => router.push(`/restaurant/${activeRestaurant.id}`)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Full Menu</Text>
-                    <ArrowRight size={14} color={colors.primary} />
-                  </Pressable>
-                </View>
-                {activeFoods.slice(0, 4).map((food) => (
-                  <FoodCard
-                    key={food.id}
-                    food={food}
-                    isFavorite={favFoodIds.has(food.id)}
-                    onToggleFavorite={() => void toggleFavorite('food', food.id)}
-                    onPress={() => router.push(`/food/${food.id}`)}
-                    onAdd={() => handleQuickAdd(food)}
-                  />
-                ))}
-              </View>
-            ) : null}
-
-            {/* Available SaaS Restaurants List */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Store size={18} color={colors.primary} />
-                  <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                    {activeRestaurant ? 'All Partner Kitchens' : 'Choose Your Restaurant'}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                  {filteredRestaurants.length} kitchens
-                </Text>
-              </View>
-
-              {filteredRestaurants.length === 0 ? (
-                <EmptyState
-                  title="No matching restaurants"
-                  description="Try clearing your search to see all available restaurants."
-                  actionLabel="Show All Restaurants"
-                  onAction={() => setSearch('')}
-                />
-              ) : (
-                filteredRestaurants.map((rest) => {
-                  const isActive = activeRestaurant?.id === rest.id;
-                  return (
-                    <View
-                      key={rest.id}
-                      style={[
-                        isActive && {
-                          borderWidth: 2,
-                          borderColor: colors.primary,
-                          borderRadius: radii.xl,
-                          padding: 4,
-                          backgroundColor: colors.primarySoft,
-                        },
-                      ]}
-                    >
-                      {isActive ? (
-                        <View style={styles.activeTagRow}>
-                          <CheckCircle2 size={14} color={colors.primary} />
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
-                            ACTIVE KITCHEN · TAP TO VIEW MENU
-                          </Text>
-                        </View>
-                      ) : null}
-                      <RestaurantCard
-                        restaurant={rest}
-                        isFavorite={favRestIds.has(rest.id)}
-                        onToggleFavorite={() => void toggleFavorite('restaurant', rest.id)}
-                        onPress={() => handleRestaurantPress(rest)}
-                      />
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          </>
         ) : (
-          /* Single-Restaurant Mode: Direct Food Menu */
+          /* Home Tab: Always Show Restaurants First */
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Our Food Menu</Text>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
-                {activeFoods.length} items
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Store size={18} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                  Restaurants
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                {filteredRestaurants.length} {filteredRestaurants.length === 1 ? 'kitchen' : 'kitchens'}
               </Text>
             </View>
-            {activeFoods.map((food) => (
-              <FoodCard
-                key={food.id}
-                food={food}
-                isFavorite={favFoodIds.has(food.id)}
-                onToggleFavorite={() => void toggleFavorite('food', food.id)}
-                onPress={() => router.push(`/food/${food.id}`)}
-                onAdd={() => handleQuickAdd(food)}
+
+            {filteredRestaurants.length === 0 ? (
+              <EmptyState
+                title="No matching restaurants"
+                description="Try clearing your search to see all available restaurants."
+                actionLabel="Show All Restaurants"
+                onAction={() => setSearch('')}
               />
-            ))}
+            ) : (
+              filteredRestaurants.map((rest) => {
+                const isActive = activeRestaurant?.id === rest.id;
+                return (
+                  <View
+                    key={rest.id}
+                    style={[
+                      isActive && {
+                        borderWidth: 2,
+                        borderColor: colors.primary,
+                        borderRadius: radii.xl,
+                        padding: 4,
+                        backgroundColor: colors.primarySoft,
+                      },
+                    ]}
+                  >
+                    {isActive ? (
+                      <View style={styles.activeTagRow}>
+                        <CheckCircle2 size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
+                          ACTIVE KITCHEN · TAP TO VIEW MENU
+                        </Text>
+                      </View>
+                    ) : null}
+                    <RestaurantCard
+                      restaurant={rest}
+                      isFavorite={favRestIds.has(rest.id)}
+                      onToggleFavorite={() => void toggleFavorite('restaurant', rest.id)}
+                      onPress={() => handleRestaurantPress(rest)}
+                    />
+                  </View>
+                );
+              })
+            )}
           </View>
         )}
       </ScrollView>
