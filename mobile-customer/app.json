@@ -3,14 +3,14 @@
     "name": "Dastarkhwan",
     "slug": "zestroute-customer",
     "owner": "ihtiaws-team",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "scheme": "zestroute",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0F172A",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
@@ -21,7 +21,7 @@
     ],
     "android": {
       "package": "com.zestroute.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F47B20"
@@ -36,7 +36,19 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F172A",
+          "image": "./assets/icon.png",
+          "imageWidth": 180,
+          "dark": {
+            "image": "./assets/icon.png",
+            "backgroundColor": "#0F172A"
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {
