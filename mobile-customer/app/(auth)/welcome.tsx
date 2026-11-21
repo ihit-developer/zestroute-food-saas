@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowRight,
   Bike,
+  Crown,
   MapPin,
   ShieldCheck,
   Sparkles,
@@ -47,13 +48,19 @@ export default function WelcomeScreen() {
         password: acct.password,
       });
       await tokenStorage.setTokens(res.accessToken, res.refreshToken);
-      const isRiderOnly =
-        res.user.roles.includes('rider') && !res.user.roles.includes('customer');
+      const roles = res.user.roles;
+      let targetRole = acct.role;
+      if (targetRole === 'admin' && !roles.includes('super_admin')) targetRole = 'customer';
+      if (targetRole === 'vendor' && !roles.includes('restaurant_owner') && !roles.includes('restaurant_staff') && !roles.includes('super_admin')) {
+        targetRole = 'customer';
+      }
+      if (targetRole === 'rider' && !roles.includes('rider')) targetRole = 'customer';
+
       await saveAccount({
         identifier: acct.identifier,
         password: acct.password,
         fullName: res.user.fullName,
-        role: isRiderOnly ? 'rider' : 'customer',
+        role: targetRole,
       });
       setSession({
         id: res.user.id,
@@ -62,7 +69,15 @@ export default function WelcomeScreen() {
         phone: res.user.phone ?? '',
       });
       showToast(`Welcome back, ${res.user.fullName}!`, 'success');
-      router.replace(isRiderOnly ? '/(rider)/dashboard' : '/(tabs)/home');
+      if (targetRole === 'admin') {
+        router.replace('/(admin)/dashboard');
+      } else if (targetRole === 'vendor') {
+        router.replace('/(vendor)/dashboard');
+      } else if (targetRole === 'rider') {
+        router.replace('/(rider)/dashboard');
+      } else {
+        router.replace('/(tabs)/home');
+      }
     } catch (err) {
       const msg = err instanceof ApiClientError ? err.message : 'Unable to sign in with saved account';
       showToast(msg, 'error');
@@ -133,7 +148,15 @@ export default function WelcomeScreen() {
             </View>
             {savedAccounts.map((acct) => {
               const busy = signingInId === acct.identifier;
-              const isRider = acct.role === 'rider';
+              const roleMeta =
+                acct.role === 'admin'
+                  ? { label: 'Super Admin', bg: 'rgba(124,58,237,0.14)', color: '#7C3AED', Icon: Crown }
+                  : acct.role === 'vendor'
+                    ? { label: 'Restaurant', bg: 'rgba(37,99,235,0.14)', color: '#2563EB', Icon: Store }
+                    : acct.role === 'rider'
+                      ? { label: 'Rider', bg: 'rgba(22,163,74,0.14)', color: '#16A34A', Icon: Bike }
+                      : { label: 'Customer', bg: colors.primarySoft, color: colors.primary, Icon: User };
+              const RoleIcon = roleMeta.Icon;
               return (
                 <Pressable
                   key={acct.identifier}
@@ -149,24 +172,15 @@ export default function WelcomeScreen() {
                     },
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.roleIcon,
-                      { backgroundColor: isRider ? 'rgba(22,163,74,0.14)' : colors.primarySoft },
-                    ]}
-                  >
-                    {isRider ? (
-                      <Bike size={18} color="#16A34A" />
-                    ) : (
-                      <User size={18} color={colors.primary} />
-                    )}
+                  <View style={[styles.roleIcon, { backgroundColor: roleMeta.bg }]}>
+                    <RoleIcon size={18} color={roleMeta.color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.textPrimary }} numberOfLines={1}>
                       {busy ? 'Signing in...' : acct.fullName}
                     </Text>
                     <Text style={{ fontSize: 11.5, color: colors.textSecondary }} numberOfLines={1}>
-                      {isRider ? 'Rider' : 'Customer'} · {acct.identifier}
+                      {roleMeta.label} · {acct.identifier}
                     </Text>
                   </View>
                   <ArrowRight size={16} color={colors.primary} />
@@ -189,15 +203,34 @@ export default function WelcomeScreen() {
         {/* Action Buttons */}
         <View style={styles.actions}>
           <PrimaryButton
-            title={savedAccounts.length > 0 ? 'Sign In with Another Account' : 'Sign In (Customer / Rider)'}
+            title={savedAccounts.length > 0 ? 'Sign In with Another Account' : 'Sign In (All Roles)'}
             fullWidth
             onPress={() => router.push('/(auth)/login')}
           />
           <SecondaryButton
-            title="Create New Account"
+            title="Create Customer Account"
             fullWidth
             onPress={() => router.push('/(auth)/register')}
           />
+          <Pressable
+            onPress={() => router.push('/(auth)/register-restaurant')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              paddingVertical: 13,
+              borderRadius: radii.lg,
+              backgroundColor: 'rgba(244, 123, 32, 0.1)',
+              borderWidth: 1,
+              borderColor: 'rgba(244, 123, 32, 0.35)',
+            }}
+          >
+            <Store size={16} color={colors.primary} />
+            <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.primary }}>
+              Register Your Restaurant · 7-Day Free Trial
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>

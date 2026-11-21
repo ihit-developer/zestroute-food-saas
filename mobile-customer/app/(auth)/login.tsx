@@ -4,7 +4,20 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, ArrowRight, Bike, Eye, EyeOff, Lock, Mail, Sparkles, User, X } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bike,
+  Crown,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Sparkles,
+  Store,
+  User,
+  X,
+} from 'lucide-react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { IconButton, InputField, PrimaryButton, useToast } from '../../components/ui';
 import { loginSchema } from '../../features/validation/authSchemas';
@@ -14,11 +27,26 @@ import {
   removeSavedAccount,
   saveAccount,
   type SavedAccount,
+  type SavedAccountRole,
 } from '../../services/savedAccounts';
 import { useAppStore } from '../../store/useAppStore';
 import { ApiClientError } from '@zestroute/shared';
 
 type LoginForm = { identifier: string; password: string };
+
+const ROLE_OPTIONS: Array<{
+  key: SavedAccountRole;
+  label: string;
+  sub: string;
+  color: string;
+  bg: string;
+  Icon: typeof User;
+}> = [
+  { key: 'customer', label: 'Customer', sub: 'Order & Track', color: '#F47B20', bg: 'rgba(244,123,32,0.12)', Icon: User },
+  { key: 'rider', label: 'Rider', sub: 'Deliver & Earn', color: '#16A34A', bg: 'rgba(22,163,74,0.12)', Icon: Bike },
+  { key: 'vendor', label: 'Restaurant', sub: 'Kitchen & Plans', color: '#2563EB', bg: 'rgba(37,99,235,0.12)', Icon: Store },
+  { key: 'admin', label: 'Super Admin', sub: 'SaaS Control', color: '#7C3AED', bg: 'rgba(124,58,237,0.12)', Icon: Crown },
+];
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,7 +54,7 @@ export default function LoginScreen() {
   const { showToast } = useToast();
   const setSession = useAppStore((s) => s.setSession);
 
-  const [selectedRole, setSelectedRole] = useState<'customer' | 'rider'>('customer');
+  const [selectedRole, setSelectedRole] = useState<SavedAccountRole>('customer');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
@@ -46,21 +74,39 @@ export default function LoginScreen() {
     void getSavedAccounts().then(setSavedAccounts);
   }, []);
 
-  const performLogin = async (data: LoginForm, shouldRemember: boolean) => {
+  const performLogin = async (data: LoginForm, shouldRemember: boolean, roleOverride?: SavedAccountRole) => {
+    const activeRole = roleOverride ?? selectedRole;
     try {
       const res = await authApi.login(data);
       await tokenStorage.setTokens(res.accessToken, res.refreshToken);
-      const isRiderAccount = res.user.roles.includes('rider');
-      const isCustomerAccount = res.user.roles.includes('customer');
-      const goToRider =
-        selectedRole === 'rider'
-          ? isRiderAccount
-          : isRiderAccount && !isCustomerAccount;
+      const roles = res.user.roles;
 
-      if (selectedRole === 'rider' && !isRiderAccount) {
+      const isAdmin = roles.includes('super_admin');
+      const isVendor = roles.includes('restaurant_owner') || roles.includes('restaurant_staff') || isAdmin;
+      const isRider = roles.includes('rider');
+      const isCustomer = roles.includes('customer');
+
+      if (activeRole === 'admin' && !isAdmin) {
         await tokenStorage.clearTokens();
-        showToast('This account is not a Rider account. Switch to Customer above.', 'error');
+        showToast('This account is not a Super Admin account.', 'error');
         return;
+      }
+      if (activeRole === 'vendor' && !isVendor) {
+        await tokenStorage.clearTokens();
+        showToast('This account is not a Restaurant Vendor account.', 'error');
+        return;
+      }
+      if (activeRole === 'rider' && !isRider) {
+        await tokenStorage.clearTokens();
+        showToast('This account is not a Rider account.', 'error');
+        return;
+      }
+
+      let resolvedRole: SavedAccountRole = activeRole;
+      if (activeRole === 'customer' && !isCustomer) {
+        if (isAdmin) resolvedRole = 'admin';
+        else if (isVendor) resolvedRole = 'vendor';
+        else if (isRider) resolvedRole = 'rider';
       }
 
       if (shouldRemember) {
@@ -68,7 +114,7 @@ export default function LoginScreen() {
           identifier: data.identifier,
           password: data.password,
           fullName: res.user.fullName,
-          role: goToRider ? 'rider' : 'customer',
+          role: resolvedRole,
         });
         setSavedAccounts(nextSaved);
       }
@@ -79,8 +125,15 @@ export default function LoginScreen() {
         email: res.user.email ?? '',
         phone: res.user.phone ?? '',
       });
-      showToast(`Signed in as ${goToRider ? 'Rider' : 'Customer'}`, 'success');
-      if (goToRider) {
+
+      const label = ROLE_OPTIONS.find((r) => r.key === resolvedRole)?.label ?? 'User';
+      showToast(`Signed in as ${label}`, 'success');
+
+      if (resolvedRole === 'admin') {
+        router.replace('/(admin)/dashboard');
+      } else if (resolvedRole === 'vendor') {
+        router.replace('/(vendor)/dashboard');
+      } else if (resolvedRole === 'rider') {
         router.replace('/(rider)/dashboard');
       } else {
         router.replace('/(tabs)/home');
@@ -100,7 +153,7 @@ export default function LoginScreen() {
     setValue('identifier', acct.identifier);
     setValue('password', acct.password);
     try {
-      await performLogin({ identifier: acct.identifier, password: acct.password }, true);
+      await performLogin({ identifier: acct.identifier, password: acct.password }, true, acct.role);
     } finally {
       setSigningInSaved(null);
     }
@@ -111,6 +164,8 @@ export default function LoginScreen() {
     setSavedAccounts(next);
     showToast('Account removed from saved list', 'info');
   };
+
+  const filteredSaved = savedAccounts.filter((a) => a.role === selectedRole);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -124,68 +179,51 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>Sign In to Dastarkhwan</Text>
           <Text style={[styles.sub, { color: colors.textSecondary }]}>
-            Choose your role first, then sign in once for 1-tap access next time.
+            Choose your workspace role, then sign in once for 1-tap access next time.
           </Text>
         </View>
 
-        {/* Step 1: Choose Role First (Customer vs Rider) */}
+        {/* 2x2 Role Selector */}
         <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 }}>
+          <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.6 }}>
             1. CHOOSE YOUR ROLE
           </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              onPress={() => setSelectedRole('customer')}
-              style={[
-                styles.roleCard,
-                {
-                  backgroundColor: selectedRole === 'customer' ? colors.primarySoft : colors.surface,
-                  borderColor: selectedRole === 'customer' ? colors.primary : colors.border,
-                  borderRadius: radii.lg,
-                },
-              ]}
-            >
-              <User size={20} color={selectedRole === 'customer' ? colors.primary : colors.textSecondary} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '800',
-                  color: selectedRole === 'customer' ? colors.primary : colors.textPrimary,
-                }}
-              >
-                Customer
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.textSecondary }}>Order &amp; Track Food</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setSelectedRole('rider')}
-              style={[
-                styles.roleCard,
-                {
-                  backgroundColor: selectedRole === 'rider' ? 'rgba(22,163,74,0.12)' : colors.surface,
-                  borderColor: selectedRole === 'rider' ? '#16A34A' : colors.border,
-                  borderRadius: radii.lg,
-                },
-              ]}
-            >
-              <Bike size={20} color={selectedRole === 'rider' ? '#16A34A' : colors.textSecondary} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '800',
-                  color: selectedRole === 'rider' ? '#16A34A' : colors.textPrimary,
-                }}
-              >
-                Rider
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.textSecondary }}>Deliver &amp; Earn</Text>
-            </Pressable>
+          <View style={styles.roleGrid}>
+            {ROLE_OPTIONS.map((opt) => {
+              const active = selectedRole === opt.key;
+              const IconComp = opt.Icon;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setSelectedRole(opt.key)}
+                  style={[
+                    styles.roleCard,
+                    {
+                      backgroundColor: active ? opt.bg : colors.surface,
+                      borderColor: active ? opt.color : colors.border,
+                      borderRadius: radii.lg,
+                    },
+                  ]}
+                >
+                  <IconComp size={20} color={active ? opt.color : colors.textSecondary} />
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: '800',
+                      color: active ? opt.color : colors.textPrimary,
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textSecondary }}>{opt.sub}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
         {/* Saved Accounts Filtered for Selected Role */}
-        {savedAccounts.filter((a) => a.role === selectedRole).length > 0 ? (
+        {filteredSaved.length > 0 ? (
           <View
             style={[
               styles.savedBox,
@@ -198,11 +236,10 @@ export default function LoginScreen() {
                 SAVED {selectedRole.toUpperCase()} ACCOUNTS · 1-TAP SIGN IN
               </Text>
             </View>
-            {savedAccounts
-              .filter((a) => a.role === selectedRole)
-              .map((acct) => {
+            {filteredSaved.map((acct) => {
               const busy = signingInSaved === acct.identifier;
-              const isRider = acct.role === 'rider';
+              const roleMeta = ROLE_OPTIONS.find((r) => r.key === acct.role) ?? ROLE_OPTIONS[0];
+              const RoleIcon = roleMeta.Icon;
               return (
                 <Pressable
                   key={acct.identifier}
@@ -217,24 +254,15 @@ export default function LoginScreen() {
                     },
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.roleIcon,
-                      { backgroundColor: isRider ? 'rgba(22,163,74,0.14)' : colors.primarySoft },
-                    ]}
-                  >
-                    {isRider ? (
-                      <Bike size={17} color="#16A34A" />
-                    ) : (
-                      <User size={17} color={colors.primary} />
-                    )}
+                  <View style={[styles.roleIcon, { backgroundColor: roleMeta.bg }]}>
+                    <RoleIcon size={17} color={roleMeta.color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.textPrimary }} numberOfLines={1}>
                       {busy ? 'Signing in...' : acct.fullName}
                     </Text>
                     <Text style={{ fontSize: 11.5, color: colors.textSecondary }} numberOfLines={1}>
-                      {isRider ? 'Rider' : 'Customer'} · {acct.identifier}
+                      {roleMeta.label} · {acct.identifier}
                     </Text>
                   </View>
                   <ArrowRight size={16} color={colors.primary} />
@@ -315,25 +343,33 @@ export default function LoginScreen() {
               </Text>
             </View>
             <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-                Forgot?
-              </Text>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Forgot?</Text>
             </Pressable>
           </View>
 
           <PrimaryButton
-            title="Sign In"
+            title={`Sign In as ${ROLE_OPTIONS.find((r) => r.key === selectedRole)?.label ?? 'User'}`}
             fullWidth
             loading={isSubmitting}
             onPress={handleSubmit(onSubmit)}
           />
         </View>
 
-        <View style={styles.footerRow}>
-          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Don&apos;t have an account?</Text>
-          <Pressable onPress={() => router.push('/(auth)/register')}>
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>Sign Up</Text>
-          </Pressable>
+        <View style={styles.footerCol}>
+          <View style={styles.footerRow}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>New customer?</Text>
+            <Pressable onPress={() => router.push('/(auth)/register')}>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13.5 }}>Sign Up</Text>
+            </Pressable>
+          </View>
+          <View style={styles.footerRow}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>Own a restaurant?</Text>
+            <Pressable onPress={() => router.push('/(auth)/register-restaurant')}>
+              <Text style={{ color: '#2563EB', fontWeight: '800', fontSize: 13.5 }}>
+                Start 7-Day Free Trial
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -342,10 +378,23 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scroll: { padding: 24, gap: 20 },
+  scroll: { padding: 22, gap: 18 },
   header: { gap: 6 },
-  title: { fontSize: 26, fontWeight: '800' },
-  sub: { fontSize: 14, lineHeight: 20 },
+  title: { fontSize: 25, fontWeight: '900' },
+  sub: { fontSize: 13.5, lineHeight: 20 },
+  roleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  roleCard: {
+    width: '48%',
+    borderWidth: 2,
+    paddingVertical: 13,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    gap: 3,
+  },
   savedBox: { padding: 14, borderWidth: 1, gap: 10 },
   savedHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   savedRow: {
@@ -362,20 +411,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roleCard: {
-    flex: 1,
-    borderWidth: 2,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    gap: 4,
-  },
-  form: { gap: 16 },
+  form: { gap: 15 },
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
-  footerRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 8 },
+  footerCol: { gap: 8, marginTop: 4, alignItems: 'center' },
+  footerRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
 });

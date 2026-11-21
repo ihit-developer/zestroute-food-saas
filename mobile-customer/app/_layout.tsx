@@ -78,6 +78,8 @@ const RootNavigator: React.FC = () => {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(rider)" />
+        <Stack.Screen name="(vendor)" />
+        <Stack.Screen name="(admin)" />
         <Stack.Screen name="restaurant/[id]" />
         <Stack.Screen name="food/[id]" />
         <Stack.Screen name="cart/index" />
