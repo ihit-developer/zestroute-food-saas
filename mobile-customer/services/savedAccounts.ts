@@ -2,13 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SAVED_ACCOUNTS_KEY = 'zr_saved_login_accounts_v1';
 
-export type SavedAccountRole = 'customer' | 'rider' | 'vendor' | 'admin';
-
 export interface SavedAccount {
   identifier: string;
   password: string;
   fullName: string;
-  role: SavedAccountRole;
+  role: 'customer' | 'rider';
   lastUsedAt: string;
 }
 

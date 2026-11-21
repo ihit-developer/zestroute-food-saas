@@ -11,7 +11,6 @@ import {
   ReviewModel,
 } from '../models/index.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { SubscriptionService } from './subscription.service.js';
 
 export class CatalogService {
   static async getHomeFeed(selectedRestaurantId?: string) {
@@ -32,18 +31,12 @@ export class CatalogService {
         .lean(),
     ]);
 
-    // Enforce active Free Trial or Paid Subscription for customer-facing catalog
-    const activeRestIdSet = await SubscriptionService.getActiveRestaurantIdSet(
-      approvedRestaurants.map((r) => String(r._id))
-    );
-    const activeRestaurants = approvedRestaurants.filter((r) => activeRestIdSet.has(String(r._id)));
-
-    // If a specific restaurant is chosen, load only its menu; otherwise load all active restaurants' dishes
+    // Mobile customer app is 100% free — show all approved restaurants
     const targetRestaurantIds = selectedRestaurantId
-      ? activeRestaurants
+      ? approvedRestaurants
           .filter((r) => String(r._id) === selectedRestaurantId)
           .map((r) => r._id)
-      : activeRestaurants.map((r) => r._id);
+      : approvedRestaurants.map((r) => r._id);
 
     const foods =
       targetRestaurantIds.length > 0
@@ -56,12 +49,12 @@ export class CatalogService {
             .lean()
         : [];
 
-    const restIds = activeRestaurants.map((r) => r._id);
+    const restIds = approvedRestaurants.map((r) => r._id);
     const branches = await RestaurantBranchModel.find({ restaurantId: { $in: restIds } }).lean();
     const branchByRestId = new Map(branches.map((b) => [String(b.restaurantId), b]));
-    const restNameById = new Map(activeRestaurants.map((r) => [String(r._id), r.name]));
+    const restNameById = new Map(approvedRestaurants.map((r) => [String(r._id), r.name]));
 
-    const restaurantCards = activeRestaurants.map((r) => {
+    const restaurantCards = approvedRestaurants.map((r) => {
       const b = branchByRestId.get(String(r._id));
       return {
         id: String(r._id),
@@ -143,19 +136,14 @@ export class CatalogService {
     const sort: Record<string, 1 | -1> =
       params.sortBy === 'rating' ? { ratingAvg: -1 } : { ratingCount: -1, ratingAvg: -1 };
 
-    const [rawItems] = await Promise.all([
+    const [items, total] = await Promise.all([
       RestaurantModel.find(filter)
         .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
+      RestaurantModel.countDocuments(filter),
     ]);
-
-    const activeIdSet = await SubscriptionService.getActiveRestaurantIdSet(
-      rawItems.map((r) => String(r._id))
-    );
-    const items = rawItems.filter((r) => activeIdSet.has(String(r._id)));
-    const total = items.length;
 
     const branches = await RestaurantBranchModel.find({
       restaurantId: { $in: items.map((r) => r._id) },
@@ -207,15 +195,12 @@ export class CatalogService {
     }).lean();
     const imgByFoodId = new Map(foodImages.map((i) => [String(i.foodItemId), i.url]));
 
-    const subStatus = await SubscriptionService.evaluateRestaurantSubscription(restaurantId);
-
     return {
       restaurant,
       branches,
       categories,
       foods: foods.map((f) => ({ ...f, imageUrl: imgByFoodId.get(String(f._id)) })),
       reviews,
-      subscriptionActive: subStatus.isAccessAllowed,
     };
   }
 

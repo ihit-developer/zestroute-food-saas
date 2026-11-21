@@ -189,20 +189,21 @@ export class SubscriptionService {
     } | null;
 
     const { defaultTrialDays } = await this.getTrialConfig();
-    const resolvedPlanName =
-      sub.status === 'trial'
-        ? `${defaultTrialDays}-Day Free Trial`
-        : pkg?.name ?? 'Standard';
+    const isTrialRecord = sub.status === 'trial' || (sub.status === 'active' && sub.billingCycle === 'trial');
+    const resolvedStatus = isTrialRecord ? 'trial' : sub.status;
+    const resolvedPlanName = isTrialRecord
+      ? `${defaultTrialDays}-Day Free Trial`
+      : pkg?.name ?? 'Standard';
 
     return {
       id: String(sub._id),
-      status: sub.status,
+      status: resolvedStatus,
       isAccessAllowed,
-      isTrial: sub.status === 'trial',
-      billingCycle: sub.status === 'trial' ? 'trial' : sub.billingCycle,
+      isTrial: isTrialRecord,
+      billingCycle: isTrialRecord ? 'trial' : sub.billingCycle,
       packageId: pkg?._id ? String(pkg._id) : null,
       packageName: resolvedPlanName,
-      platformAccess: sub.status === 'trial' ? 'both' : (pkg?.platformAccess ?? 'both'),
+      platformAccess: isTrialRecord ? 'both' : (pkg?.platformAccess ?? 'both'),
       features: pkg?.features ?? [],
       trialStartDate: sub.trialStartsAt ? sub.trialStartsAt.toISOString() : undefined,
       trialEndDate: sub.trialEndsAt ? sub.trialEndsAt.toISOString() : undefined,
@@ -548,12 +549,13 @@ export class SubscriptionService {
       const exp =
         s.status === 'trial' && s.trialEndsAt ? new Date(s.trialEndsAt) : new Date(s.currentPeriodEnd);
       const remainingDays = Math.max(0, Math.ceil((exp.getTime() - now.getTime()) / MS_PER_DAY));
-      const isAccessAllowed = (s.status === 'trial' || s.status === 'active') && exp > now;
-      const resolvedPkgName =
-        s.status === 'trial'
-          ? `${trialConfig.defaultTrialDays}-Day Free Trial`
-          : pkg?.name ?? 'Standard';
-      const resolvedCycle = s.status === 'trial' ? 'trial' : s.billingCycle;
+      const isTrialRecord = s.status === 'trial' || (s.status === 'active' && s.billingCycle === 'trial');
+      const resolvedStatus = isTrialRecord ? 'trial' : s.status;
+      const isAccessAllowed = (resolvedStatus === 'trial' || resolvedStatus === 'active') && exp > now;
+      const resolvedPkgName = isTrialRecord
+        ? `${trialConfig.defaultTrialDays}-Day Free Trial`
+        : pkg?.name ?? 'Standard';
+      const resolvedCycle = isTrialRecord ? 'trial' : s.billingCycle;
       return {
         id: String(s._id),
         restaurantId: String(rest?._id ?? s.restaurantId),
@@ -563,7 +565,7 @@ export class SubscriptionService {
         packageId: pkg?._id ? String(pkg._id) : null,
         packageName: resolvedPkgName,
         billingCycle: resolvedCycle,
-        status: s.status,
+        status: resolvedStatus,
         isAccessAllowed,
         startsAt: String(s.currentPeriodStart),
         expiresAt: exp.toISOString(),
@@ -764,27 +766,31 @@ export class SubscriptionService {
       }
     }
 
-    if (input.grantFreeAccess) {
+    if (input.status === 'trial' || input.billingCycle === 'trial') {
+      sub.status = 'trial';
+      sub.billingCycle = 'trial';
+      const { defaultTrialDays } = await this.getTrialConfig();
+      const targetDays = input.setDaysFromNow ?? input.extendDays ?? defaultTrialDays;
+      const tEnd = input.expiresAt
+        ? new Date(input.expiresAt)
+        : new Date(now.getTime() + targetDays * MS_PER_DAY);
+      sub.trialStartsAt = now;
+      sub.trialEndsAt = tEnd;
+      sub.currentPeriodStart = now;
+      sub.currentPeriodEnd = tEnd;
+    } else if (input.grantFreeAccess) {
       sub.status = 'active';
-      if (!input.billingCycle) {
-        const totalDays = input.setDaysFromNow ?? input.extendDays ?? 30;
-        sub.billingCycle = totalDays >= 365 ? 'yearly' : 'monthly';
-      }
+      const totalDays = input.setDaysFromNow ?? input.extendDays ?? 30;
+      sub.billingCycle = input.billingCycle ?? (totalDays >= 365 ? 'yearly' : 'monthly');
       if (new Date(sub.currentPeriodEnd) <= now) {
-        sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
+        sub.currentPeriodEnd = new Date(now.getTime() + totalDays * MS_PER_DAY);
       }
     } else if (input.status) {
       sub.status = input.status;
-      if (input.status === 'active' && new Date(sub.currentPeriodEnd) <= now) {
-        sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
-      }
-      if (input.status === 'trial') {
-        const { defaultTrialDays } = await this.getTrialConfig();
-        if (!sub.trialEndsAt || new Date(sub.trialEndsAt) <= now) {
-          const tEnd = new Date(now.getTime() + defaultTrialDays * MS_PER_DAY);
-          sub.trialStartsAt = now;
-          sub.trialEndsAt = tEnd;
-          sub.currentPeriodEnd = tEnd;
+      if (input.status === 'active') {
+        if (sub.billingCycle === 'trial') sub.billingCycle = 'monthly';
+        if (new Date(sub.currentPeriodEnd) <= now) {
+          sub.currentPeriodEnd = new Date(now.getTime() + 30 * MS_PER_DAY);
         }
       }
     }

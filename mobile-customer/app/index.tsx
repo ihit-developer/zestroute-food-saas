@@ -24,7 +24,7 @@ export default function SplashScreen() {
 
     const timer = setTimeout(async () => {
       try {
-        let loggedInRole: 'customer' | 'rider' | 'vendor' | 'admin' | null = null;
+        let loggedInRole: 'customer' | 'rider' | null = null;
         const token = await tokenStorage.getAccessToken();
         if (token) {
           try {
@@ -35,29 +35,13 @@ export default function SplashScreen() {
               email: me.profile.email ?? '',
               phone: me.profile.phone ?? '',
             });
-            if (me.roles.includes('super_admin')) {
-              loggedInRole = 'admin';
-            } else if (
-              (me.roles.includes('restaurant_owner') || me.roles.includes('restaurant_staff')) &&
-              !me.roles.includes('customer')
-            ) {
-              loggedInRole = 'vendor';
-            } else if (me.roles.includes('rider') && !me.roles.includes('customer')) {
-              loggedInRole = 'rider';
-            } else {
-              loggedInRole = 'customer';
-            }
+            loggedInRole =
+              me.roles.includes('rider') && !me.roles.includes('customer') ? 'rider' : 'customer';
           } catch {
             await tokenStorage.clearTokens();
           }
         }
-        if (loggedInRole === 'admin') {
-          setHasCompletedOnboarding(true);
-          router.replace('/(admin)/dashboard');
-        } else if (loggedInRole === 'vendor') {
-          setHasCompletedOnboarding(true);
-          router.replace('/(vendor)/dashboard');
-        } else if (loggedInRole === 'rider') {
+        if (loggedInRole === 'rider') {
           setHasCompletedOnboarding(true);
           router.replace('/(rider)/dashboard');
         } else if (loggedInRole === 'customer') {
@@ -91,7 +75,7 @@ export default function SplashScreen() {
         </Text>
         <Text style={styles.tagline}>{strings.brandTagline}</Text>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>CUSTOMER · RIDER · VENDOR · ADMIN</Text>
+          <Text style={styles.pillText}>CUSTOMER · RIDER · LIVE GPS</Text>
         </View>
       </Animated.View>
       <View style={styles.loaderWrap}>

@@ -28,7 +28,6 @@ import {
 } from '../models/index.js';
 import { CartService } from './cart.service.js';
 import { RiderService } from './rider.service.js';
-import { SubscriptionService } from './subscription.service.js';
 import { generateTextPdf, type PdfLine } from '../utils/pdf.js';
 import { generateNumericOtp, hashToken } from '../utils/crypto.js';
 import { AppError } from '../middleware/error.middleware.js';
@@ -74,14 +73,6 @@ export class OrderService {
     if (!address) throw new AppError(404, 'ADDRESS_NOT_FOUND', 'Delivery address not found');
     if (!restaurant || !branch || branch.isTemporarilyClosed) {
       throw new AppError(400, 'RESTAURANT_UNAVAILABLE', 'Restaurant is closed or unapproved');
-    }
-    const subStatus = await SubscriptionService.evaluateRestaurantSubscription(String(restaurant._id));
-    if (!subStatus.isAccessAllowed) {
-      throw new AppError(
-        403,
-        'RESTAURANT_SUBSCRIPTION_INACTIVE',
-        'This restaurant is currently unavailable for online ordering.'
-      );
     }
     if (cartItems.length === 0) throw new AppError(400, 'EMPTY_CART', 'Cart has no items');
     if (freshCart.subtotalMinor < branch.minOrderMinor) {

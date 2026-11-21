@@ -62,7 +62,6 @@ interface RestaurantDetailPayload {
     comment?: string;
     ownerReply?: string;
   }>;
-  subscriptionActive?: boolean;
 }
 
 export default function RestaurantDetailsScreen() {
@@ -180,28 +179,9 @@ export default function RestaurantDetailsScreen() {
                 <Image source={{ uri: data.restaurant.coverUrl }} style={{ width: '100%', height: '100%' }} />
               ) : null}
               <View style={styles.coverBadge}>
-                <StatusBadge
-                  label={data.subscriptionActive === false ? 'Unavailable' : 'Available Now'}
-                  tone={data.subscriptionActive === false ? 'error' : 'success'}
-                />
+                <StatusBadge label="Available Now" tone="success" />
               </View>
             </View>
-
-            {data.subscriptionActive === false ? (
-              <View
-                style={{
-                  padding: 14,
-                  borderRadius: radii.lg,
-                  backgroundColor: '#FEF2F2',
-                  borderWidth: 1,
-                  borderColor: '#FCA5A5',
-                }}
-              >
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#991B1B' }}>
-                  This restaurant is currently unavailable for online ordering.
-                </Text>
-              </View>
-            ) : null}
 
             {/* Restaurant Info Card */}
             <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.lg }]}>
@@ -326,10 +306,6 @@ export default function RestaurantDetailsScreen() {
                       onToggleFavorite={() => void toggleFavorite('food', food._id)}
                       onPress={() => router.push(`/food/${food._id}`)}
                       onAdd={() => {
-                        if (data.subscriptionActive === false) {
-                          showToast('This restaurant is currently unavailable for online ordering.', 'error');
-                          return;
-                        }
                         const status = addToCart(data.restaurant._id, data.restaurant.name, {
                           id: `${food._id}-base`,
                           foodId: food._id,

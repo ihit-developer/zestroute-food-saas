@@ -417,22 +417,25 @@ export const SubscriptionsPage: React.FC = () => {
                 {
                   key: 'packageName',
                   header: 'Active Plan & Cycle',
-                  render: (r) => (
-                    <div>
-                      <div style={{ fontWeight: 800 }}>
-                        {r.status === 'trial'
-                          ? r.packageName
-                          : `${r.packageName} — ${r.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+                  render: (r) => {
+                    const isTrial = r.status === 'trial' || r.billingCycle === 'trial';
+                    return (
+                      <div>
+                        <div style={{ fontWeight: 800 }}>
+                          {isTrial
+                            ? r.packageName
+                            : `${r.packageName} — ${r.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)' }}>
+                          {isTrial
+                            ? 'Free Trial Period'
+                            : r.billingCycle === 'yearly'
+                              ? 'Annual Subscription'
+                              : 'Monthly Subscription'}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)' }}>
-                        {r.status === 'trial'
-                          ? 'Free Trial Period'
-                          : r.billingCycle === 'yearly'
-                            ? 'Annual Subscription'
-                            : 'Monthly Subscription'}
-                      </div>
-                    </div>
-                  ),
+                    );
+                  },
                 },
                 {
                   key: 'status',
@@ -805,11 +808,11 @@ export const SubscriptionsPage: React.FC = () => {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[
-                  { label: '+7d Free', days: 7, cycle: 'trial' },
-                  { label: '+30d (1 Mo Free)', days: 30, cycle: 'monthly' },
-                  { label: '+90d (3 Mo Free)', days: 90, cycle: 'monthly' },
-                  { label: '+365d (1 Yr Free)', days: 365, cycle: 'yearly' },
-                  { label: 'Lifetime Free (10 Yrs)', days: 3650, cycle: 'yearly' },
+                  { label: '7-Day Free Trial', days: 7, cycle: 'trial', status: 'trial', free: false },
+                  { label: '+30d (1 Mo Free)', days: 30, cycle: 'monthly', status: 'active', free: true },
+                  { label: '+90d (3 Mo Free)', days: 90, cycle: 'monthly', status: 'active', free: true },
+                  { label: '+365d (1 Yr Free)', days: 365, cycle: 'yearly', status: 'active', free: true },
+                  { label: 'Lifetime Free (10 Yrs)', days: 3650, cycle: 'yearly', status: 'active', free: true },
                 ].map((preset) => (
                   <SecondaryButton
                     key={preset.label}
@@ -818,12 +821,12 @@ export const SubscriptionsPage: React.FC = () => {
                       void handleSaveVendorControl(
                         {
                           packageId: managePkgId || undefined,
-                          status: 'active',
+                          status: preset.status,
                           billingCycle: preset.cycle,
-                          grantFreeAccess: true,
+                          grantFreeAccess: preset.free,
                           setDaysFromNow: preset.days,
                         },
-                        `Granted ${preset.label} to ${manageTarget.restaurantName}!`
+                        `Applied ${preset.label} to ${manageTarget.restaurantName}!`
                       )
                     }
                   >
