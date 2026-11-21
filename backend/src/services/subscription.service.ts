@@ -371,30 +371,61 @@ export class SubscriptionService {
     const [list, subs] = await Promise.all([
       SubscriptionPackageModel.find().sort({ sortOrder: 1, createdAt: 1 }).lean(),
       VendorSubscriptionModel.find({ status: { $in: ['active', 'trial'] } })
-        .select('packageId')
+        .populate('restaurantId', 'name')
+        .populate('ownerId', 'fullName email')
         .lean(),
     ]);
-    const countMap = new Map<string, number>();
+    const now = new Date();
+    const subscribersMap = new Map<
+      string,
+      Array<{
+        restaurantId: string;
+        restaurantName: string;
+        ownerName: string;
+        ownerEmail: string;
+        accountType: string;
+        status: string;
+        remainingDays: number;
+      }>
+    >();
     for (const s of subs) {
-      if (s.packageId) {
-        const key = String(s.packageId);
-        countMap.set(key, (countMap.get(key) ?? 0) + 1);
-      }
+      if (!s.packageId) continue;
+      const key = String(s.packageId);
+      const rest = s.restaurantId as unknown as { _id?: unknown; name?: string } | null;
+      const owner = s.ownerId as unknown as { fullName?: string; email?: string } | null;
+      const exp =
+        s.status === 'trial' && s.trialEndsAt ? new Date(s.trialEndsAt) : new Date(s.currentPeriodEnd);
+      const remainingDays = Math.max(0, Math.ceil((exp.getTime() - now.getTime()) / MS_PER_DAY));
+      const arr = subscribersMap.get(key) ?? [];
+      arr.push({
+        restaurantId: String(rest?._id ?? s.restaurantId),
+        restaurantName: rest?.name ?? 'Restaurant',
+        ownerName: owner?.fullName ?? 'Owner',
+        ownerEmail: owner?.email ?? '',
+        accountType: 'Restaurant',
+        status: s.status,
+        remainingDays,
+      });
+      subscribersMap.set(key, arr);
     }
-    return list.map((p) => ({
-      id: String(p._id),
-      name: p.name,
-      slug: p.slug,
-      description: p.description ?? '',
-      monthlyPriceMinor: p.monthlyPriceMinor,
-      yearlyPriceMinor: p.yearlyPriceMinor,
-      platformAccess: (p.platformAccess as 'web_only' | 'mobile_only' | 'both') ?? 'both',
-      subscriberCount: countMap.get(String(p._id)) ?? 0,
-      features: p.features ?? [],
-      isActive: p.isActive,
-      trialEligible: p.trialEligible,
-      sortOrder: p.sortOrder,
-    }));
+    return list.map((p) => {
+      const subscribers = subscribersMap.get(String(p._id)) ?? [];
+      return {
+        id: String(p._id),
+        name: p.name,
+        slug: p.slug,
+        description: p.description ?? '',
+        monthlyPriceMinor: p.monthlyPriceMinor,
+        yearlyPriceMinor: p.yearlyPriceMinor,
+        platformAccess: (p.platformAccess as 'web_only' | 'mobile_only' | 'both') ?? 'both',
+        subscriberCount: subscribers.length,
+        subscribers,
+        features: p.features ?? [],
+        isActive: p.isActive,
+        trialEligible: p.trialEligible,
+        sortOrder: p.sortOrder,
+      };
+    });
   }
 
   static async createPackage(input: {

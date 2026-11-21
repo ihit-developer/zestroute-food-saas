@@ -45,6 +45,15 @@ import { useAppStore } from '../../store/useAppStore';
 
 type AdminTab = 'vendors' | 'payments' | 'packages' | 'config';
 
+interface PackageSubscriber {
+  restaurantId: string;
+  restaurantName: string;
+  ownerName: string;
+  accountType: string;
+  status: string;
+  remainingDays: number;
+}
+
 interface AdminPackage {
   id: string;
   name: string;
@@ -53,6 +62,7 @@ interface AdminPackage {
   yearlyPriceMinor: number;
   platformAccess?: 'web_only' | 'mobile_only' | 'both';
   subscriberCount?: number;
+  subscribers?: PackageSubscriber[];
   features: string[];
   isActive: boolean;
   sortOrder: number;
@@ -558,6 +568,42 @@ export default function SuperAdminMobileDashboard() {
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
                       Monthly: {formatMoney(pkg.monthlyPriceMinor)} · Yearly: {formatMoney(pkg.yearlyPriceMinor)}
                     </Text>
+                    {(pkg.subscribers ?? []).length > 0 ? (
+                      <View
+                        style={{
+                          padding: 10,
+                          borderRadius: 10,
+                          backgroundColor: colors.background,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          gap: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.textSecondary }}>
+                          ACTIVATED BY ({pkg.subscribers?.length})
+                        </Text>
+                        {(pkg.subscribers ?? []).map((s) => (
+                          <View key={s.restaurantId} style={styles.rowBetween}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>
+                                {s.restaurantName}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                                {s.accountType} · {s.ownerName}
+                              </Text>
+                            </View>
+                            <StatusBadge
+                              label={`${s.status === 'trial' ? 'TRIAL' : 'ACTIVE'} · ${s.remainingDays}d`}
+                              tone={s.status === 'trial' ? 'info' : 'success'}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 11.5, color: colors.textSecondary }}>
+                        Not activated by any restaurant yet
+                      </Text>
+                    )}
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                       <Pressable
                         onPress={() => openPkgForm(pkg)}

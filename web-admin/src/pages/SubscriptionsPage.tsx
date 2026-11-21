@@ -28,6 +28,16 @@ import {
 } from '../components/ui/AdminUI';
 import { adminHttpClient } from '../services/apiClient';
 
+interface PackageSubscriber {
+  restaurantId: string;
+  restaurantName: string;
+  ownerName: string;
+  ownerEmail: string;
+  accountType: string;
+  status: string;
+  remainingDays: number;
+}
+
 interface AdminPackage {
   id: string;
   name: string;
@@ -36,6 +46,7 @@ interface AdminPackage {
   yearlyPriceMinor: number;
   platformAccess?: 'web_only' | 'mobile_only' | 'both';
   subscriberCount?: number;
+  subscribers?: PackageSubscriber[];
   features: string[];
   isActive: boolean;
   trialEligible?: boolean;
@@ -621,12 +632,42 @@ export const SubscriptionsPage: React.FC = () => {
                 header: 'Platform Scope',
                 render: (r) => {
                   const meta = PLATFORM_LABELS[r.platformAccess ?? 'both'];
+                  return <StatusBadge label={meta.label} tone={meta.tone} />;
+                },
+              },
+              {
+                key: 'subscribers',
+                header: 'Activated By (Restaurants)',
+                render: (r) => {
+                  const subs = r.subscribers ?? [];
+                  if (subs.length === 0) {
+                    return <span style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>No active restaurants</span>;
+                  }
                   return (
-                    <div>
-                      <StatusBadge label={meta.label} tone={meta.tone} />
-                      <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)', marginTop: 4 }}>
-                        {r.subscriberCount ?? 0} active {(r.subscriberCount ?? 0) === 1 ? 'restaurant' : 'restaurants'}
-                      </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {subs.map((s) => (
+                        <div
+                          key={s.restaurantId}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            flexWrap: 'wrap',
+                            fontSize: 12,
+                            padding: '4px 8px',
+                            borderRadius: 8,
+                            background: 'var(--zr-surface-alt)',
+                            border: '1px solid var(--zr-border)',
+                          }}
+                        >
+                          <strong style={{ color: 'var(--zr-text-primary)' }}>{s.restaurantName}</strong>
+                          <span style={{ color: 'var(--zr-text-secondary)' }}>({s.accountType} · {s.ownerName})</span>
+                          <StatusBadge
+                            label={`${s.status === 'trial' ? 'Trial' : 'Active'} · ${s.remainingDays}d`}
+                            tone={s.status === 'trial' ? 'info' : 'success'}
+                          />
+                        </div>
+                      ))}
                     </div>
                   );
                 },
