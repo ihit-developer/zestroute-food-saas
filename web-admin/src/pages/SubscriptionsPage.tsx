@@ -419,20 +419,35 @@ export const SubscriptionsPage: React.FC = () => {
                   header: 'Active Plan & Cycle',
                   render: (r) => {
                     const isTrial = r.status === 'trial' || r.billingCycle === 'trial';
+                    const isLifetime = !isTrial && r.remainingDays >= 1800;
+                    const isYearly = !isTrial && !isLifetime && (r.billingCycle === 'yearly' || r.remainingDays >= 330);
+                    const isMultiMonth = !isTrial && !isLifetime && !isYearly && r.remainingDays > 45;
+                    const monthsCount = Math.max(2, Math.round(r.remainingDays / 30));
+
+                    const title = isTrial
+                      ? r.packageName
+                      : isLifetime
+                        ? `${r.packageName} — Lifetime`
+                        : isYearly
+                          ? `${r.packageName} — Yearly`
+                          : isMultiMonth
+                            ? `${r.packageName} — ${monthsCount} Months`
+                            : `${r.packageName} — Monthly`;
+
+                    const subtitle = isTrial
+                      ? 'Free Trial Period'
+                      : isLifetime
+                        ? 'Lifetime Free / Partner Access'
+                        : isYearly
+                          ? 'Annual Subscription'
+                          : isMultiMonth
+                            ? `Multi-Month Subscription (${monthsCount} Months)`
+                            : 'Monthly Subscription';
+
                     return (
                       <div>
-                        <div style={{ fontWeight: 800 }}>
-                          {isTrial
-                            ? r.packageName
-                            : `${r.packageName} — ${r.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)' }}>
-                          {isTrial
-                            ? 'Free Trial Period'
-                            : r.billingCycle === 'yearly'
-                              ? 'Annual Subscription'
-                              : 'Monthly Subscription'}
-                        </div>
+                        <div style={{ fontWeight: 800 }}>{title}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--zr-text-secondary)' }}>{subtitle}</div>
                       </div>
                     );
                   },

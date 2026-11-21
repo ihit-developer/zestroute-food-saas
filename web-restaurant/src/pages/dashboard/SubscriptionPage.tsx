@@ -290,15 +290,25 @@ export const SubscriptionPage: React.FC = () => {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--zr-text-secondary)', textTransform: 'uppercase' }}>
               {sub.status === 'trial'
                 ? `${trialDays}-Day Free Trial`
-                : sub.billingCycle === 'yearly'
-                  ? 'Yearly Subscription'
-                  : 'Monthly Subscription'}
+                : sub.remainingDays >= 1800
+                  ? 'Lifetime Access'
+                  : sub.billingCycle === 'yearly' || sub.remainingDays >= 330
+                    ? 'Yearly Subscription'
+                    : sub.remainingDays > 45
+                      ? `${Math.max(2, Math.round(sub.remainingDays / 30))}-Month Subscription`
+                      : 'Monthly Subscription'}
             </span>
           </div>
           <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>
             {sub.status === 'trial'
               ? sub.packageName
-              : `${sub.packageName} — ${sub.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+              : sub.remainingDays >= 1800
+                ? `${sub.packageName} — Lifetime`
+                : sub.billingCycle === 'yearly' || sub.remainingDays >= 330
+                  ? `${sub.packageName} — Yearly`
+                  : sub.remainingDays > 45
+                    ? `${sub.packageName} — ${Math.max(2, Math.round(sub.remainingDays / 30))} Months`
+                    : `${sub.packageName} — Monthly`}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--zr-text-secondary)' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--zr-text-primary)' }}>
