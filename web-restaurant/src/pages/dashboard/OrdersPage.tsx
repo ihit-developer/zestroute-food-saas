@@ -290,7 +290,7 @@ export const OrdersPage: React.FC = () => {
 </head>
 <body>
   <div class="brand">
-    <h2>${order.restaurantName || 'ZestRoute Kitchen'}</h2>
+    <h2>${order.restaurantName || 'Dastarkhwan Kitchen'}</h2>
     <p>OFFICIAL ORDER RECEIPT &amp; KITCHEN TICKET</p>
   </div>
   <div class="meta">
@@ -315,7 +315,7 @@ export const OrdersPage: React.FC = () => {
     <div class="row grand"><span>GRAND TOTAL</span><span>${formatMoney(order.totalMinor)}</span></div>
   </div>
   <div class="footer">
-    <p>Thank you for ordering with ZestRoute!</p>
+    <p>Thank you for ordering with Dastarkhwan!</p>
   </div>
 </body>
 </html>`);

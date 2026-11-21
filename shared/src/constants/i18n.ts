@@ -29,7 +29,7 @@ export const COMMON_STRINGS: Record<
   }
 > = {
   en: {
-    brandName: 'ZestRoute',
+    brandName: 'Dastarkhwan',
     brandTagline: 'Fresh food, delivered fast',
     searchPlaceholder: 'Search restaurants, dishes, or cuisines...',
     addToCart: 'Add to Cart',

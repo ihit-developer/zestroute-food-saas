@@ -22,13 +22,13 @@ const PAYMENT_METHODS = [
   { key: 'jazzcash', label: 'JazzCash (Online Verified)', Icon: Smartphone },
   { key: 'easypaisa', label: 'Easypaisa (Online Verified)', Icon: Smartphone },
   { key: 'card', label: 'Bank Transfer / Card (Online Verified)', Icon: CreditCard },
-  { key: 'wallet', label: 'ZestRoute Wallet', Icon: Wallet },
+  { key: 'wallet', label: 'Dastarkhwan Wallet', Icon: Wallet },
 ] as const;
 
 const MERCHANT_ACCOUNT_INFO: Record<'jazzcash' | 'easypaisa' | 'card', string> = {
-  jazzcash: 'JazzCash Merchant Account: 0300-1234567 (ZestRoute Foods)',
-  easypaisa: 'Easypaisa Merchant Account: 0345-1234567 (ZestRoute Foods)',
-  card: 'Bank IBAN: PK36ZEST00001234567890 (ZestRoute Pvt Ltd)',
+  jazzcash: 'JazzCash Merchant Account: 0300-1234567 (Dastarkhwan Foods)',
+  easypaisa: 'Easypaisa Merchant Account: 0345-1234567 (Dastarkhwan Foods)',
+  card: 'Bank IBAN: PK36DAST00001234567890 (Dastarkhwan Pvt Ltd)',
 };
 
 export default function CheckoutScreen() {

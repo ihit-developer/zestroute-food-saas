@@ -494,7 +494,7 @@ export const RefundsPage: React.FC = () => {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Refund &amp; Dispute Queue</h2>
           <span style={{ fontSize: 13, color: 'var(--zr-text-secondary)' }}>
-            Review customer refund requests and credit ZestRoute wallets atomically
+            Review customer refund requests and credit Dastarkhwan wallets atomically
           </span>
         </div>
         <StatusBadge label={`${pendingCount} pending`} tone={pendingCount > 0 ? 'warning' : 'success'} />

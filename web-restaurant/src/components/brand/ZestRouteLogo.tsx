@@ -17,7 +17,7 @@ export const ZestRouteLogo: React.FC<ZestRouteLogoProps> = ({
         viewBox="0 0 40 40"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-label="ZestRoute Logo"
+        aria-label="Dastarkhwan Logo"
       >
         <rect width="40" height="40" rx="12" fill="#F47B20" />
         {/* Stylized cloche + route pin */}
@@ -38,7 +38,7 @@ export const ZestRouteLogo: React.FC<ZestRouteLogoProps> = ({
               letterSpacing: '-0.02em',
             }}
           >
-            Zest<span style={{ color: 'var(--zr-primary)' }}>Route</span>
+            Dastar<span style={{ color: 'var(--zr-primary)' }}>khwan</span>
           </span>
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--zr-text-secondary)' }}>
             FRESH &amp; FAST

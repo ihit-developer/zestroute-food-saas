@@ -112,7 +112,7 @@ export const AdminShell: React.FC = () => {
                 </span>
               </div>
               <span style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
-                ZestRoute Super Admin · Multi-Restaurant SaaS Control Center
+                Dastarkhwan Super Admin · Multi-Restaurant SaaS Control Center
               </span>
             </div>
           </div>

@@ -71,7 +71,7 @@ export default function SplashScreen() {
           <Image source={APP_LOGO} style={styles.logoImg} resizeMode="cover" />
         </View>
         <Text style={styles.brand}>
-          Zest<Text style={{ color: '#F47B20' }}>Route</Text>
+          Dastar<Text style={{ color: '#F47B20' }}>khwan</Text>
         </Text>
         <Text style={styles.tagline}>{strings.brandTagline}</Text>
         <View style={styles.pill}>
@@ -80,7 +80,7 @@ export default function SplashScreen() {
       </Animated.View>
       <View style={styles.loaderWrap}>
         <ActivityIndicator size="small" color="#F47B20" />
-        <Text style={styles.loaderText}>Connecting to ZestRoute...</Text>
+        <Text style={styles.loaderText}>Connecting to Dastarkhwan...</Text>
       </View>
     </View>
   );

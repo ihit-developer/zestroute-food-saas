@@ -29,7 +29,7 @@ export const ZestRouteLogo: React.FC<ZestRouteLogoProps> = ({
       {!compact && (
         <View>
           <Text style={[styles.wordmark, { color: colors.textPrimary }]}>
-            Zest<Text style={{ color: colors.primary }}>Route</Text>
+            Dastar<Text style={{ color: colors.primary }}>khwan</Text>
           </Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>FRESH &amp; FAST</Text>
         </View>

@@ -159,7 +159,7 @@ export const AdminDashboardPage: React.FC = () => {
               borderRadius: 999,
             }}
           >
-            <Sparkles size={13} /> ZESTROUTE MULTI-RESTAURANT SAAS
+            <Sparkles size={13} /> DASTARKHWAN MULTI-RESTAURANT SAAS
           </span>
           <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em' }}>
             Live Platform Command Center

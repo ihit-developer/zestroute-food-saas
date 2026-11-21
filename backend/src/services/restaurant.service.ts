@@ -201,7 +201,7 @@ export class RestaurantService {
       return {
         id: String(o._id),
         orderNumber: o.orderNumber,
-        restaurantName: restaurant?.name ?? 'ZestRoute Kitchen',
+        restaurantName: restaurant?.name ?? 'Dastarkhwan Kitchen',
         customerName: addr?.fullName ?? customer?.fullName ?? 'Customer',
         customerPhone: addr?.phone ?? customer?.phone ?? '',
         deliveryAddress: addr

@@ -486,7 +486,7 @@ export class AdminService {
       title: status === 'approved' ? 'Refund Approved & Credited!' : 'Refund Request Update',
       body:
         status === 'approved'
-          ? `PKR ${(refund.amountMinor / 100).toFixed(2)} has been credited to your ZestRoute Wallet.`
+          ? `PKR ${(refund.amountMinor / 100).toFixed(2)} has been credited to your Dastarkhwan Wallet.`
           : adminNotes || 'Your refund request was reviewed by our team.',
       data: { orderId: String(refund.orderId) },
     }).catch(() => {});
@@ -527,7 +527,7 @@ export class AdminService {
     return (
       doc ?? {
         key: 'platform_config',
-        appName: 'ZestRoute',
+        appName: 'Dastarkhwan',
         taxBps: 0,
         minOrderMinor: 30000,
         defaultCommissionBps: 1500,

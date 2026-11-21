@@ -62,7 +62,7 @@ export const AnalyticsPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `zestroute-analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `dastarkhwan-analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -77,9 +77,9 @@ export const AnalyticsPage: React.FC = () => {
       return;
     }
     const rows = metrics.map((m) => `<tr><td>${m.label}</td><td><strong>${m.value}</strong></td></tr>`).join('');
-    win.document.write(`<!doctype html><html><head><title>ZestRoute Platform Analytics (${period})</title>
+    win.document.write(`<!doctype html><html><head><title>Dastarkhwan Platform Analytics (${period})</title>
       <style>body{font-family:system-ui,sans-serif;padding:24px}h2{color:#F47B20}table{width:100%;border-collapse:collapse;margin-top:16px}td{border:1px solid #ddd;padding:10px;font-size:14px}</style>
-      </head><body><h2>ZestRoute Platform Analytics (${period.toUpperCase()})</h2>
+      </head><body><h2>Dastarkhwan Platform Analytics (${period.toUpperCase()})</h2>
       <p>Generated ${new Date().toLocaleString()}</p>
       <table><tbody>${rows}</tbody></table></body></html>`);
     win.document.close();
@@ -152,7 +152,7 @@ export const PlatformSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { theme, locale, toggleTheme, toggleLocale } = useAdminStore();
   const { data: settings } = useAdminSettings();
-  const [appName, setAppName] = useState('ZestRoute');
+  const [appName, setAppName] = useState('Dastarkhwan');
   const [taxPct, setTaxPct] = useState('0');
   const [minOrderPkr, setMinOrderPkr] = useState('300');
   const [commissionPct, setCommissionPct] = useState('15');

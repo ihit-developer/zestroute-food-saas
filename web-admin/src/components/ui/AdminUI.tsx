@@ -13,7 +13,7 @@ export const ZestRouteLogo: React.FC<{ compact?: boolean }> = ({ compact = false
     {!compact && (
       <div style={{ lineHeight: 1.1 }}>
         <div style={{ fontSize: 17, fontWeight: 700 }}>
-          Zest<span style={{ color: 'var(--zr-primary)' }}>Route</span>
+          Dastar<span style={{ color: 'var(--zr-primary)' }}>khwan</span>
         </div>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--zr-text-secondary)' }}>SUPER ADMIN</div>
       </div>

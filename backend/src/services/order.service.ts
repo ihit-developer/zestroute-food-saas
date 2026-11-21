@@ -476,10 +476,10 @@ export class OrderService {
     const fmt = (minor: number) => `${order.currency} ${(minor / 100).toFixed(2)}`;
     const addr = order.deliveryAddressSnapshot;
     const lines: PdfLine[] = [
-      { text: 'ZESTROUTE - TAX INVOICE & ORDER RECEIPT', size: 16, bold: true, gap: 24 },
+      { text: 'DASTARKHWAN - TAX INVOICE & ORDER RECEIPT', size: 16, bold: true, gap: 24 },
       { text: `Order Number: ${order.orderNumber}`, size: 11, bold: true },
       { text: `Date: ${new Date(order.createdAt).toISOString().slice(0, 19).replace('T', ' ')} UTC`, size: 10 },
-      { text: `Restaurant: ${restaurant?.name ?? 'ZestRoute Partner'}`, size: 11 },
+      { text: `Restaurant: ${restaurant?.name ?? 'Dastarkhwan Partner'}`, size: 11 },
       { text: `Order Status: ${order.status.toUpperCase()}  |  Payment: ${order.paymentMethod.toUpperCase()} (${order.paymentStatus.toUpperCase()})`, size: 10, gap: 20 },
       { text: 'DELIVERY ADDRESS', size: 11, bold: true, gap: 15 },
       { text: `${addr?.fullName ?? 'Customer'} (${addr?.phone ?? ''})`, size: 10 },
@@ -503,7 +503,7 @@ export class OrderService {
       { text: `Tax: ${fmt(order.taxMinor)}`, size: 10 },
       { text: `Tip: ${fmt(order.tipMinor)}`, size: 10, gap: 18 },
       { text: `TOTAL PAID: ${fmt(order.totalMinor)}`, size: 13, bold: true, gap: 24 },
-      { text: 'Thank you for ordering with ZestRoute.', size: 10 }
+      { text: 'Thank you for ordering with Dastarkhwan.', size: 10 }
     );
 
     const safeOrderNo = String(order.orderNumber).replace(/[^a-zA-Z0-9_-]/g, '');

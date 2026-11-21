@@ -89,7 +89,7 @@ export default function WalletAndLoyaltyScreen() {
             <PrimaryButton
               title="Order Food"
               onPress={() => {
-                showToast('Select ZestRoute Wallet at Checkout to spend balance', 'info');
+                showToast('Select Dastarkhwan Wallet at Checkout to spend balance', 'info');
                 router.push('/(tabs)/home');
               }}
             />

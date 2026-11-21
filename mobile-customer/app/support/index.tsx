@@ -20,7 +20,7 @@ const FAQS = [
   },
   {
     q: 'How do refunds work?',
-    a: 'Approved refunds are credited to your ZestRoute Wallet or original payment method per platform policy.',
+    a: 'Approved refunds are credited to your Dastarkhwan Wallet or original payment method per platform policy.',
   },
   {
     q: 'How can I track my delivery rider?',

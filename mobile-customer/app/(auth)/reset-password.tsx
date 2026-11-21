@@ -32,7 +32,7 @@ export default function ResetPasswordScreen() {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Reset Password</Text>
         <Text style={[styles.sub, { color: colors.textSecondary }]}>
-          Choose a strong new password for your ZestRoute account.
+          Choose a strong new password for your Dastarkhwan account.
         </Text>
       </View>
       <Controller

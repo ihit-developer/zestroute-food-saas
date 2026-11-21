@@ -142,7 +142,7 @@ export default function ProfileScreen() {
       <ConfirmationDialog
         visible={logoutOpen}
         title="Log Out?"
-        message="Are you sure you want to log out of your ZestRoute account?"
+        message="Are you sure you want to log out of your Dastarkhwan account?"
         onCancel={() => setLogoutOpen(false)}
         onConfirm={async () => {
           setLogoutOpen(false);

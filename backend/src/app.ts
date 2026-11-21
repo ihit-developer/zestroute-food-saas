@@ -56,7 +56,7 @@ export function createApp() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZestRoute — Unified Platform Portal</title>
+  <title>Dastarkhwan — Unified Platform Portal</title>
   <style>
     body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #FFF9F2; color: #292522; padding: 32px 20px; }
     .wrap { max-width: 920px; margin: 0 auto; }
@@ -74,9 +74,9 @@ export function createApp() {
 <body>
   <div class="wrap">
     <div class="hdr">
-      <div class="logo">Z</div>
+      <div class="logo">D</div>
       <div>
-        <h1>ZestRoute Platform Portal</h1>
+        <h1>Dastarkhwan Platform Portal</h1>
         <p>Single hub for all 4 role interfaces &amp; centralized API</p>
       </div>
     </div>

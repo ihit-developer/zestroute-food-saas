@@ -122,7 +122,7 @@ export default function LoginScreen() {
         />
 
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>Sign In to ZestRoute</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>Sign In to Dastarkhwan</Text>
           <Text style={[styles.sub, { color: colors.textSecondary }]}>
             Choose your role first, then sign in once for 1-tap access next time.
           </Text>

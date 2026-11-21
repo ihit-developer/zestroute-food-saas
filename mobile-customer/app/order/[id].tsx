@@ -163,7 +163,7 @@ export default function OrderDetailScreen() {
           .join('\n');
         await Share.share({
           title: `Invoice ${order?.orderNumber ?? id}`,
-          message: `ZestRoute Invoice ${order?.orderNumber ?? id}\nStatus: ${order?.status ?? ''}\n${itemLines}\nTotal: ${formatMoney(order?.totalMinor ?? 0)}`,
+          message: `Dastarkhwan Invoice ${order?.orderNumber ?? id}\nStatus: ${order?.status ?? ''}\n${itemLines}\nTotal: ${formatMoney(order?.totalMinor ?? 0)}`,
         });
         showToast('Invoice ready to share', 'success');
       }

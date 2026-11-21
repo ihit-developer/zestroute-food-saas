@@ -86,7 +86,7 @@ export default function WelcomeScreen() {
             <Image source={APP_LOGO} style={styles.logoImg} resizeMode="cover" />
             <View style={{ flex: 1 }}>
               <Text style={styles.brandTitle}>
-                Zest<Text style={{ color: '#FDBA74' }}>Route</Text>
+                Dastar<Text style={{ color: '#FDBA74' }}>khwan</Text>
               </Text>
               <Text style={styles.brandSub}>Multi-Restaurant Food Delivery</Text>
             </View>

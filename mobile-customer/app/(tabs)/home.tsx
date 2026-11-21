@@ -235,7 +235,7 @@ export default function HomeScreen() {
             <View style={styles.heroTag}>
               <Sparkles size={12} color="#FFF" />
               <Text style={styles.heroTagText}>
-                {activeRestaurant ? `Ordering from ${activeRestaurant.name}` : 'ZestRoute Multi-Kitchen SaaS'}
+                {activeRestaurant ? `Ordering from ${activeRestaurant.name}` : 'Dastarkhwan Food Delivery'}
               </Text>
             </View>
             <Text style={styles.heroTitle}>

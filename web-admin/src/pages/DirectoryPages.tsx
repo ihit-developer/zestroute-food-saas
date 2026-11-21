@@ -180,7 +180,7 @@ export const RestaurantsPage: React.FC = () => {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Partner Restaurants</h2>
           <span style={{ fontSize: 13, color: 'var(--zr-text-secondary)' }}>
-            Live SaaS kitchens active on the ZestRoute marketplace
+            Live SaaS kitchens active on the Dastarkhwan marketplace
           </span>
         </div>
         <div style={{ width: 320 }}>
@@ -350,7 +350,7 @@ export const RestaurantApplicationsPage: React.FC = () => {
       >
         <p style={{ margin: 0, color: 'var(--zr-text-secondary)', lineHeight: 1.6 }}>
           Approve or reject <strong>{reviewItem?.name}</strong> ({reviewItem?.city}). Approving immediately publishes
-          this restaurant to the ZestRoute customer app and records an immutable audit log entry.
+          this restaurant to the Dastarkhwan customer app and records an immutable audit log entry.
         </p>
       </Modal>
     </div>

@@ -4,7 +4,7 @@ import mongoose, { Schema } from 'mongoose';
 const appSettingSchema = new Schema(
   {
     key: { type: String, required: true, default: 'platform_config' },
-    appName: { type: String, default: 'ZestRoute' },
+    appName: { type: String, default: 'Dastarkhwan' },
     defaultCurrency: { type: String, default: 'PKR' },
     taxBps: { type: Number, default: 0, min: 0, max: 3000 },
     defaultCommissionBps: { type: Number, default: 1500, min: 0, max: 5000 },

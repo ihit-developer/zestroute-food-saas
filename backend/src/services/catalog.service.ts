@@ -79,7 +79,7 @@ export class CatalogService {
     const foodCards = foods.map((f) => ({
       id: String(f._id),
       restaurantId: String(f.restaurantId),
-      restaurantName: restNameById.get(String(f.restaurantId)) ?? 'ZestRoute Kitchen',
+      restaurantName: restNameById.get(String(f.restaurantId)) ?? 'Dastarkhwan Kitchen',
       name: f.name,
       description: f.description,
       imageUrl: imgByFoodId.get(String(f._id)),
