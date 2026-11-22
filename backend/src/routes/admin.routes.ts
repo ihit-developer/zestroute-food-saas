@@ -15,6 +15,7 @@ import {
 } from '../validators/admin.validators.js';
 import { AdminService } from '../services/admin.service.js';
 import { SubscriptionService } from '../services/subscription.service.js';
+import { CustomerEngagementService } from '../services/customerEngagement.service.js';
 
 export const adminRouter = Router();
 adminRouter.use(authenticate, requireRole('super_admin'));
@@ -344,6 +345,58 @@ adminRouter.patch('/refunds/:id', validateBody(processRefundSchema), async (req,
 adminRouter.get('/complaints', async (_req, res, next) => {
   try {
     const data = await AdminService.listComplaints();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Real-Time Live Support Chat Desk (Customers, Riders & Restaurant Owners) ───
+
+adminRouter.get('/support/tickets', async (_req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.listAllSupportTicketsForAdmin();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/support/tickets/:ticketId', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.getSupportTicketDetail(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      true
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/support/tickets/:ticketId/messages', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.postSupportMessage(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      'super_admin',
+      String(req.body?.message ?? '')
+    );
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/support/tickets/:ticketId/status', async (req, res, next) => {
+  try {
+    const allowed = ['open', 'in_progress', 'resolved', 'closed'] as const;
+    const status = allowed.includes(req.body?.status) ? req.body.status : 'resolved';
+    const data = await CustomerEngagementService.updateSupportTicketStatus(
+      String(req.params.ticketId),
+      status
+    );
     res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);

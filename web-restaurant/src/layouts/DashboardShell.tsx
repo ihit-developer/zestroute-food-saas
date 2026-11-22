@@ -10,6 +10,7 @@ import {
   DollarSign,
   FolderTree,
   Globe,
+  Headphones,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -71,6 +72,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
     { key: '/reviews', label: 'Reviews', icon: <MessageSquare size={18} /> },
     { key: '/finance', label: 'Finance', icon: <DollarSign size={18} /> },
     { key: '/subscription', label: 'Subscription', icon: <CreditCard size={18} /> },
+    { key: '/support', label: 'Live Support', icon: <Headphones size={18} /> },
     { key: '/profile', label: 'Profile', icon: <Store size={18} /> },
     { key: '/settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
@@ -88,7 +90,9 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
   useEffect(() => {
     if (!sub) return;
     const isExempt =
-      location.pathname.startsWith('/subscription') || location.pathname.startsWith('/profile');
+      location.pathname.startsWith('/subscription') ||
+      location.pathname.startsWith('/support') ||
+      location.pathname.startsWith('/profile');
     if (!sub.isAccessAllowed && !isExempt) {
       navigate('/subscription', { replace: true });
     }

@@ -58,7 +58,7 @@ export const AdminShell: React.FC = () => {
     { key: '/commissions', label: 'Commissions', icon: <Percent size={17} /> },
     { key: '/payments', label: 'Payments', icon: <CreditCard size={17} /> },
     { key: '/refunds', label: 'Refunds & Disputes', icon: <RotateCcw size={17} /> },
-    { key: '/complaints', label: 'Complaints', icon: <MessageSquareWarning size={17} /> },
+    { key: '/complaints', label: 'Live Support & Chat', icon: <MessageSquareWarning size={17} /> },
     { key: '/analytics', label: 'Analytics & Reports', icon: <BarChart3 size={17} /> },
     { key: '/audit-logs', label: 'Audit Logs', icon: <Activity size={17} /> },
     { key: '/settings', label: 'Platform Settings', icon: <Settings size={17} /> },

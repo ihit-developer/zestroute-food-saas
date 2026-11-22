@@ -352,7 +352,7 @@ customerRouter.patch('/notifications/read-all', ...customerAuth, async (req, res
   }
 });
 
-customerRouter.get('/support/tickets', ...customerAuth, async (req, res, next) => {
+customerRouter.get('/support/tickets', authenticate, async (req, res, next) => {
   try {
     const data = await CustomerEngagementService.listSupportTickets(req.auth!.userId);
     res.status(200).json({ success: true, data });
@@ -361,9 +361,51 @@ customerRouter.get('/support/tickets', ...customerAuth, async (req, res, next) =
   }
 });
 
-customerRouter.post('/support/tickets', ...customerAuth, validateBody(createSupportTicketSchema), async (req, res, next) => {
+customerRouter.post('/support/tickets', authenticate, validateBody(createSupportTicketSchema), async (req, res, next) => {
   try {
-    const data = await CustomerEngagementService.createSupportTicket(req.auth!.userId, req.body);
+    const roles = req.auth!.roles ?? [];
+    const senderRole = roles.includes('restaurant_owner') || roles.includes('restaurant_staff')
+      ? 'restaurant_owner'
+      : roles.includes('rider')
+        ? 'rider'
+        : 'customer';
+    const data = await CustomerEngagementService.createSupportTicket(req.auth!.userId, req.body, senderRole);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.get('/support/tickets/:ticketId', authenticate, async (req, res, next) => {
+  try {
+    const isAdmin = (req.auth!.roles ?? []).includes('super_admin');
+    const data = await CustomerEngagementService.getSupportTicketDetail(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      isAdmin
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.post('/support/tickets/:ticketId/messages', authenticate, async (req, res, next) => {
+  try {
+    const roles = req.auth!.roles ?? [];
+    const senderRole = roles.includes('super_admin')
+      ? 'super_admin'
+      : roles.includes('restaurant_owner') || roles.includes('restaurant_staff')
+        ? 'restaurant_owner'
+        : roles.includes('rider')
+          ? 'rider'
+          : 'customer';
+    const data = await CustomerEngagementService.postSupportMessage(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      senderRole,
+      String(req.body?.message ?? '')
+    );
     res.status(201).json({ success: true, data });
   } catch (err) {
     next(err);

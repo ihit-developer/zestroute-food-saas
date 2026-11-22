@@ -121,14 +121,19 @@ export default function NewSupportTicketScreen() {
           fullWidth
           onPress={handleSubmit(async (values) => {
             try {
-              await httpClient.post('/support/tickets', {
+              const created = await httpClient.post<{ id?: string; _id?: string }>('/support/tickets', {
                 category: values.category,
                 subject: values.subject.trim(),
                 message: values.description.trim(),
               });
               await queryClient.invalidateQueries({ queryKey: ['customer', 'support-tickets'] });
-              showToast('Support ticket submitted!', 'success');
-              router.back();
+              showToast('Support ticket created! Connecting to live chat...', 'success');
+              const ticketId = created?.id ?? created?._id;
+              if (ticketId) {
+                router.replace(`/support/ticket/${ticketId}`);
+              } else {
+                router.back();
+              }
             } catch (err) {
               showToast(err instanceof ApiClientError ? err.message : 'Unable to submit ticket', 'error');
             }
