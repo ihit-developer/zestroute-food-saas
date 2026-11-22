@@ -27,6 +27,7 @@ import { BottomNav, IconButton, SecondaryButton, Sidebar, TopNav, type NavItem }
 import { useRestaurantStore } from '../store/useRestaurantStore';
 import { restaurantAuthApi, restaurantHttpClient, restaurantTokenStorage } from '../services/apiClient';
 import type { VendorSubscriptionOverview } from '../pages/dashboard/SubscriptionPage';
+import { LiveOrderAlertPopup } from '../components/LiveOrderAlertPopup';
 
 export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = ({
   title = 'Portal',
@@ -112,6 +113,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
       />
 
       <div className="zr-main">
+        <LiveOrderAlertPopup />
         {/* Big Prominent Active Restaurant Brand Banner */}
         <div
           style={{

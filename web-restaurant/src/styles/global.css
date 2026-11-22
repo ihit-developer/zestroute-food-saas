@@ -54,6 +54,41 @@ textarea {
   border-radius: var(--zr-radius-sm);
 }
 
+@keyframes zr-slide-in-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(48px) scale(0.92);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes zr-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 123, 32, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(244, 123, 32, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 123, 32, 0);
+  }
+}
+
+.zr-order-popup {
+  animation: zr-slide-in-pop 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.zr-order-pulse {
+  animation: zr-pulse-ring 1.6s infinite;
+}
+
 /* Reusable Web UI System */
 .zr-btn {
   position: relative;

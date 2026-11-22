@@ -29,6 +29,7 @@ import {
 import { AdminSidebar, IconButton, SecondaryButton, useToast, type AdminNavItem } from '../components/ui/AdminUI';
 import { useAdminStore } from '../store/useAdminStore';
 import { adminAuthApi, adminTokenStorage } from '../services/apiClient';
+import { AdminLiveOrderPopup } from '../components/AdminLiveOrderPopup';
 
 export const AdminShell: React.FC = () => {
   const navigate = useNavigate();
@@ -86,6 +87,7 @@ export const AdminShell: React.FC = () => {
       />
 
       <div className="zr-main">
+        <AdminLiveOrderPopup />
         <header className="zr-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
