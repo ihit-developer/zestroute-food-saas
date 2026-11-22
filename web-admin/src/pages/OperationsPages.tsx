@@ -31,9 +31,34 @@ interface GlobalOrderRow {
 interface GlobalCategoryRow { id: string; name: string; sortOrder: number; isActive: boolean }
 
 export const GlobalOrdersPage: React.FC = () => {
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const { data } = useAdminList<GlobalOrderRow>('orders');
+
+  const handleOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await adminHttpClient.patch(`/admin/orders/${orderId}/status`, { status });
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      showToast(`Order updated to ${status.replace(/_/g, ' ')}`);
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to update order');
+    }
+  };
+
+  const handleDeleteOrder = async (r: GlobalOrderRow) => {
+    if (!window.confirm(`Delete order ${r.orderNumber}?`)) return;
+    try {
+      await adminHttpClient.del(`/admin/orders/${r.id}`);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      showToast(`${r.orderNumber} deleted`);
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to delete order');
+    }
+  };
 
   const filtered = data.filter((r) => {
     if (statusTab !== 'all' && r.status !== statusTab) return false;
@@ -140,6 +165,35 @@ export const GlobalOrdersPage: React.FC = () => {
             key: 'date',
             header: 'Date',
             render: (r) => (r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'),
+          },
+          {
+            key: 'actions',
+            header: 'Actions',
+            render: (r) => (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select
+                  aria-label="Update order status"
+                  value={r.status}
+                  onChange={(e) => void handleOrderStatus(r.id, e.target.value)}
+                  style={{
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    border: '1px solid var(--zr-border)',
+                    background: 'var(--zr-surface)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {['pending', 'confirmed', 'preparing', 'ready_for_pickup', 'rider_assigned', 'on_the_way', 'delivered', 'cancelled'].map((s) => (
+                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+                <SecondaryButton leftIcon={<Trash2 size={13} />} onClick={() => void handleDeleteOrder(r)}>
+                  Delete
+                </SecondaryButton>
+              </div>
+            ),
           },
         ]}
         data={filtered}

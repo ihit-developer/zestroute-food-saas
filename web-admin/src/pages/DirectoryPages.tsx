@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Star } from 'lucide-react';
+import { Pencil, Star, Trash2 } from 'lucide-react';
 import { ApiClientError } from '@zestroute/shared';
 import {
   DataTable,
   EmptyState,
   ErrorState,
+  InputField,
   LoadingSkeleton,
   Modal,
   PrimaryButton,
@@ -53,6 +54,9 @@ export const CustomersPage: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [editCust, setEditCust] = useState<UserRow | null>(null);
+  const [custName, setCustName] = useState('');
+  const [custPhone, setCustPhone] = useState('');
   const { data, isLoading, isError, refetch } = useAdminList<UserRow>('customers');
 
   const toggleStatus = async (r: UserRow) => {
@@ -63,6 +67,32 @@ export const CustomersPage: React.FC = () => {
       showToast(`${r.fullName} marked ${next}`);
     } catch (err) {
       showToast(err instanceof ApiClientError ? err.message : 'Failed to update customer');
+    }
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!editCust || !custName.trim()) return;
+    try {
+      await adminHttpClient.patch(`/admin/customers/${editCust.id}`, {
+        fullName: custName.trim(),
+        phone: custPhone.trim(),
+      });
+      setEditCust(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast('Customer updated');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Update failed');
+    }
+  };
+
+  const handleDeleteCustomer = async (r: UserRow) => {
+    if (!window.confirm(`Delete customer "${r.fullName}"?`)) return;
+    try {
+      await adminHttpClient.del(`/admin/customers/${r.id}`);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast(`${r.fullName} deleted`);
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Delete failed');
     }
   };
 
@@ -127,9 +157,24 @@ export const CustomersPage: React.FC = () => {
             key: 'act',
             header: 'Actions',
             render: (r) => (
-              <SecondaryButton onClick={() => void toggleStatus(r)}>
-                {r.status === 'suspended' ? 'Activate' : 'Suspend'}
-              </SecondaryButton>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <SecondaryButton
+                  leftIcon={<Pencil size={13} />}
+                  onClick={() => {
+                    setEditCust(r);
+                    setCustName(r.fullName);
+                    setCustPhone(r.phone);
+                  }}
+                >
+                  Edit
+                </SecondaryButton>
+                <SecondaryButton onClick={() => void toggleStatus(r)}>
+                  {r.status === 'suspended' ? 'Activate' : 'Suspend'}
+                </SecondaryButton>
+                <SecondaryButton leftIcon={<Trash2 size={13} />} onClick={() => void handleDeleteCustomer(r)}>
+                  Delete
+                </SecondaryButton>
+              </div>
             ),
           },
         ]}
@@ -137,6 +182,22 @@ export const CustomersPage: React.FC = () => {
         rowKey={(r) => r.id}
         emptyState={<EmptyState title="No customers found" description="Registered customer accounts appear here." />}
       />
+      <Modal
+        open={Boolean(editCust)}
+        title={`Edit Customer: ${editCust?.fullName ?? ''}`}
+        onClose={() => setEditCust(null)}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setEditCust(null)}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={() => void handleSaveCustomer()}>Save</PrimaryButton>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <InputField label="Full Name *" value={custName} onChange={(e) => setCustName(e.target.value)} />
+          <InputField label="Phone" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} />
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -145,6 +206,9 @@ export const RestaurantsPage: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [editRest, setEditRest] = useState<RestaurantRow | null>(null);
+  const [restName, setRestName] = useState('');
+  const [restCommPct, setRestCommPct] = useState('15');
   const { data, isLoading, isError, refetch } = useAdminList<RestaurantRow>('restaurants');
 
   const review = async (r: RestaurantRow, status: 'approved' | 'suspended') => {
@@ -155,6 +219,33 @@ export const RestaurantsPage: React.FC = () => {
       showToast(`${r.name} marked ${status}`);
     } catch (err) {
       showToast(err instanceof ApiClientError ? err.message : 'Failed to update restaurant');
+    }
+  };
+
+  const handleSaveRest = async () => {
+    if (!editRest || !restName.trim()) return;
+    try {
+      await adminHttpClient.patch(`/admin/restaurants/${editRest.id}`, {
+        name: restName.trim(),
+        commissionBps: Math.round(Number(restCommPct) * 100),
+      });
+      setEditRest(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'restaurants'] });
+      showToast('Restaurant updated');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Update failed');
+    }
+  };
+
+  const handleDeleteRest = async (r: RestaurantRow) => {
+    if (!window.confirm(`Delete restaurant "${r.name}"? This cannot be undone.`)) return;
+    try {
+      await adminHttpClient.del(`/admin/restaurants/${r.id}`);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'restaurants'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      showToast(`${r.name} deleted`);
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Delete failed');
     }
   };
 
@@ -250,9 +341,24 @@ export const RestaurantsPage: React.FC = () => {
             key: 'act',
             header: 'Actions',
             render: (r) => (
-              <SecondaryButton onClick={() => void review(r, r.status === 'suspended' ? 'approved' : 'suspended')}>
-                {r.status === 'suspended' ? 'Restore' : 'Suspend'}
-              </SecondaryButton>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <SecondaryButton
+                  leftIcon={<Pencil size={13} />}
+                  onClick={() => {
+                    setEditRest(r);
+                    setRestName(r.name);
+                    setRestCommPct(String(r.commissionPct ?? 15));
+                  }}
+                >
+                  Edit
+                </SecondaryButton>
+                <SecondaryButton onClick={() => void review(r, r.status === 'suspended' ? 'approved' : 'suspended')}>
+                  {r.status === 'suspended' ? 'Restore' : 'Suspend'}
+                </SecondaryButton>
+                <SecondaryButton leftIcon={<Trash2 size={13} />} onClick={() => void handleDeleteRest(r)}>
+                  Delete
+                </SecondaryButton>
+              </div>
             ),
           },
         ]}
@@ -265,6 +371,22 @@ export const RestaurantsPage: React.FC = () => {
           />
         }
       />
+      <Modal
+        open={Boolean(editRest)}
+        title={`Edit Restaurant: ${editRest?.name ?? ''}`}
+        onClose={() => setEditRest(null)}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setEditRest(null)}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={() => void handleSaveRest()}>Save</PrimaryButton>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <InputField label="Restaurant Name *" value={restName} onChange={(e) => setRestName(e.target.value)} />
+          <InputField label="Commission (%)" type="number" value={restCommPct} onChange={(e) => setRestCommPct(e.target.value)} />
+        </div>
+      </Modal>
     </div>
   );
 };

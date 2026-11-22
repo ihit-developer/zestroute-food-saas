@@ -56,6 +56,8 @@ textarea {
 
 /* Reusable Web UI System */
 .zr-btn {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -63,15 +65,18 @@ textarea {
   min-height: 44px;
   padding: 10px 18px;
   border-radius: var(--zr-radius-md);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14.5px;
+  font-weight: 700;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease, opacity 150ms ease;
+  user-select: none;
+  transition: transform 110ms cubic-bezier(0.2, 0, 0, 1), box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease, filter 120ms ease;
 }
 
 .zr-btn:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(1.5px) scale(0.96);
+  box-shadow: 0 0 0 4px rgba(244, 123, 32, 0.28) !important;
+  filter: brightness(0.95);
 }
 
 .zr-btn:disabled {
@@ -80,25 +85,29 @@ textarea {
 }
 
 .zr-btn-primary {
-  background-color: var(--zr-primary);
+  background: linear-gradient(135deg, #F47B20 0%, #EA580C 100%);
   color: var(--zr-text-on-primary);
-  box-shadow: var(--zr-shadow-sm);
+  box-shadow: 0 4px 12px rgba(244, 123, 32, 0.26);
 }
 
 .zr-btn-primary:hover:not(:disabled) {
-  background-color: var(--zr-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(244, 123, 32, 0.38);
+  filter: brightness(1.04);
 }
 
 .zr-btn-secondary {
   background-color: var(--zr-surface);
   color: var(--zr-text);
   border-color: var(--zr-border);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .zr-btn-secondary:hover:not(:disabled) {
   background-color: var(--zr-primary-soft);
   border-color: var(--zr-primary);
   color: var(--zr-secondary);
+  transform: translateY(-1px);
 }
 
 .zr-icon-btn {
@@ -112,13 +121,23 @@ textarea {
   background-color: var(--zr-surface);
   color: var(--zr-text);
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: transform 110ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
 .zr-icon-btn:hover:not(:disabled) {
   background-color: var(--zr-primary-soft);
   border-color: var(--zr-primary);
   color: var(--zr-primary);
+  transform: translateY(-1px);
+}
+
+.zr-icon-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.92);
+  box-shadow: 0 0 0 4px rgba(244, 123, 32, 0.25);
+}
+
+button:not(:disabled):active {
+  transform: scale(0.97);
 }
 
 .zr-card {

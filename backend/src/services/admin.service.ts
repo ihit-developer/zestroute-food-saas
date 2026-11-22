@@ -12,6 +12,7 @@ import {
   ProfileModel,
   PromotionalBannerModel,
   RefundModel,
+  RestaurantBranchModel,
   RestaurantModel,
   RestaurantPayoutModel,
   RiderModel,
@@ -136,6 +137,56 @@ export class AdminService {
     ).lean();
     if (!updated) throw new AppError(404, 'USER_NOT_FOUND', 'Account not found');
     return updated;
+  }
+
+  static async updateCustomer(userId: string, input: { fullName?: string; phone?: string; accountStatus?: 'active' | 'suspended' }) {
+    const patch: Record<string, unknown> = {};
+    if (input.fullName?.trim()) patch.fullName = input.fullName.trim();
+    if (input.phone !== undefined) patch.phone = input.phone.trim();
+    if (input.accountStatus) patch.accountStatus = input.accountStatus;
+    const updated = await ProfileModel.findByIdAndUpdate(userId, { $set: patch }, { new: true }).lean();
+    if (!updated) throw new AppError(404, 'USER_NOT_FOUND', 'Customer not found');
+    return updated;
+  }
+
+  static async deleteCustomer(userId: string) {
+    const deleted = await ProfileModel.findByIdAndDelete(userId).lean();
+    if (!deleted) throw new AppError(404, 'USER_NOT_FOUND', 'Customer not found');
+    await UserRoleModel.deleteMany({ userId }).catch(() => {});
+    return { deleted: true, id: userId };
+  }
+
+  static async updateRestaurant(
+    restaurantId: string,
+    input: { name?: string; description?: string; commissionBps?: number; status?: 'approved' | 'suspended' | 'pending' | 'rejected' }
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (input.name?.trim()) patch.name = input.name.trim();
+    if (input.description !== undefined) patch.description = input.description.trim();
+    if (typeof input.commissionBps === 'number') patch.commissionBps = Math.max(0, Math.min(5000, Math.round(input.commissionBps)));
+    if (input.status) patch.status = input.status;
+    const updated = await RestaurantModel.findByIdAndUpdate(restaurantId, { $set: patch }, { new: true }).lean();
+    if (!updated) throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found');
+    return updated;
+  }
+
+  static async deleteRestaurant(restaurantId: string) {
+    const deleted = await RestaurantModel.findByIdAndDelete(restaurantId).lean();
+    if (!deleted) throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found');
+    await RestaurantBranchModel.deleteMany({ restaurantId }).catch(() => {});
+    return { deleted: true, id: restaurantId };
+  }
+
+  static async updateOrderStatusAdmin(orderId: string, status: string) {
+    const updated = await OrderModel.findByIdAndUpdate(orderId, { $set: { status } }, { new: true }).lean();
+    if (!updated) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    return updated;
+  }
+
+  static async deleteOrderAdmin(orderId: string) {
+    const deleted = await OrderModel.findByIdAndDelete(orderId).lean();
+    if (!deleted) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    return { deleted: true, id: orderId };
   }
 
   static async listRestaurants(statusFilter?: string) {

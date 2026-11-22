@@ -61,6 +61,37 @@ adminRouter.patch(
   }
 );
 
+adminRouter.patch('/customers/:id', async (req, res, next) => {
+  try {
+    const data = await AdminService.updateCustomer(String(req.params.id), req.body);
+    await recordAuditLog({
+      req,
+      action: 'admin_update_customer',
+      resourceType: 'profile',
+      resourceId: String(req.params.id),
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/customers/:id', async (req, res, next) => {
+  try {
+    const data = await AdminService.deleteCustomer(String(req.params.id));
+    await recordAuditLog({
+      req,
+      action: 'admin_delete_customer',
+      resourceType: 'profile',
+      resourceId: String(req.params.id),
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.get('/restaurants', async (_req, res, next) => {
   try {
     const data = await AdminService.listRestaurants('directory');
@@ -98,6 +129,37 @@ adminRouter.patch(
     }
   }
 );
+
+adminRouter.patch('/restaurants/:id', async (req, res, next) => {
+  try {
+    const data = await AdminService.updateRestaurant(String(req.params.id), req.body);
+    await recordAuditLog({
+      req,
+      action: 'admin_update_restaurant',
+      resourceType: 'restaurant',
+      resourceId: String(req.params.id),
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/restaurants/:id', async (req, res, next) => {
+  try {
+    const data = await AdminService.deleteRestaurant(String(req.params.id));
+    await recordAuditLog({
+      req,
+      action: 'admin_delete_restaurant',
+      resourceType: 'restaurant',
+      resourceId: String(req.params.id),
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
 
 adminRouter.get('/riders', async (_req, res, next) => {
   try {
@@ -140,6 +202,37 @@ adminRouter.patch(
 adminRouter.get('/orders', async (_req, res, next) => {
   try {
     const data = await AdminService.listOrders();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/orders/:id/status', async (req, res, next) => {
+  try {
+    const data = await AdminService.updateOrderStatusAdmin(String(req.params.id), String(req.body?.status ?? 'confirmed'));
+    await recordAuditLog({
+      req,
+      action: 'admin_update_order_status',
+      resourceType: 'order',
+      resourceId: String(req.params.id),
+      after: { status: req.body?.status },
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/orders/:id', async (req, res, next) => {
+  try {
+    const data = await AdminService.deleteOrderAdmin(String(req.params.id));
+    await recordAuditLog({
+      req,
+      action: 'admin_delete_order',
+      resourceType: 'order',
+      resourceId: String(req.params.id),
+    });
     res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
