@@ -389,6 +389,68 @@ adminRouter.post('/support/tickets/:ticketId/messages', async (req, res, next) =
   }
 });
 
+adminRouter.post('/support/tickets', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.adminCreateSupportTicket(req.auth!.userId, req.body);
+    await recordAuditLog({
+      req,
+      action: 'admin_create_support_ticket',
+      resourceType: 'support_ticket',
+      resourceId: data.id,
+      after: req.body,
+    });
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/support/tickets/:ticketId', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.adminUpdateSupportTicket(
+      String(req.params.ticketId),
+      req.body
+    );
+    await recordAuditLog({
+      req,
+      action: 'admin_update_support_ticket',
+      resourceType: 'support_ticket',
+      resourceId: String(req.params.ticketId),
+      after: req.body,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/support/tickets/:ticketId', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.adminDeleteSupportTicket(String(req.params.ticketId));
+    await recordAuditLog({
+      req,
+      action: 'admin_delete_support_ticket',
+      resourceType: 'support_ticket',
+      resourceId: String(req.params.ticketId),
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/support/tickets/:ticketId/messages/:messageId', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.adminDeleteSupportMessage(
+      String(req.params.ticketId),
+      String(req.params.messageId)
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.patch('/support/tickets/:ticketId/status', async (req, res, next) => {
   try {
     const allowed = ['open', 'in_progress', 'resolved', 'closed'] as const;

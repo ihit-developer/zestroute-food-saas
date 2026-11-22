@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Headphones, Send } from 'lucide-react';
+import { Download, Edit3, Headphones, Plus, Send, Trash2 } from 'lucide-react';
 import {
   DataTable,
+  Dropdown,
   EmptyState,
   InputField,
+  Modal,
   PrimaryButton,
   SecondaryButton,
   StatusBadge,
@@ -27,6 +29,7 @@ interface AdminSupportTicket {
   category: string;
   subject: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority?: 'low' | 'medium' | 'high';
   messageCount: number;
   lastMessage: string;
   lastSenderRole: string;
@@ -53,6 +56,21 @@ export const ComplaintsPage: React.FC = () => {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Create Ticket Modal State
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newCategory, setNewCategory] = useState<'other' | 'missing_food' | 'wrong_order' | 'late_delivery' | 'refund'>('other');
+  const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [newSubject, setNewSubject] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+
+  // Edit Ticket Modal State
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSubject, setEditSubject] = useState('');
+  const [editCategory, setEditCategory] = useState<'other' | 'missing_food' | 'wrong_order' | 'late_delivery' | 'refund'>('other');
+  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [editStatus, setEditStatus] = useState<'open' | 'in_progress' | 'resolved' | 'closed'>('open');
 
   const { data: tickets = [] } = useQuery<AdminSupportTicket[]>({
     queryKey: ['admin', 'support-tickets'],
@@ -106,6 +124,87 @@ export const ComplaintsPage: React.FC = () => {
     }
   };
 
+  const handleCreateTicket = async () => {
+    if (!newSubject.trim() || !newMessage.trim()) {
+      showToast('Subject and initial message are required');
+      return;
+    }
+    try {
+      const created = await adminHttpClient.post<{ id: string }>('/admin/support/tickets', {
+        userEmail: newEmail.trim() || undefined,
+        category: newCategory,
+        priority: newPriority,
+        subject: newSubject.trim(),
+        message: newMessage.trim(),
+      });
+      setCreateOpen(false);
+      setNewEmail('');
+      setNewSubject('');
+      setNewMessage('');
+      setSelectedId(created.id);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'support-tickets'] });
+      showToast('Support ticket created!');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to create ticket');
+    }
+  };
+
+  const openEditTicket = () => {
+    if (!detail?.ticket) return;
+    setEditSubject(detail.ticket.subject);
+    setEditCategory((detail.ticket.category as typeof editCategory) ?? 'other');
+    setEditPriority(detail.ticket.priority ?? 'medium');
+    setEditStatus(detail.ticket.status);
+    setEditOpen(true);
+  };
+
+  const handleUpdateTicket = async () => {
+    if (!activeId || !editSubject.trim()) return;
+    try {
+      await adminHttpClient.patch(`/admin/support/tickets/${activeId}`, {
+        subject: editSubject.trim(),
+        category: editCategory,
+        priority: editPriority,
+        status: editStatus,
+      });
+      setEditOpen(false);
+      await Promise.all([
+        refetchDetail(),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'support-tickets'] }),
+      ]);
+      showToast('Ticket updated!');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to update ticket');
+    }
+  };
+
+  const handleDeleteTicket = async () => {
+    if (!activeId) return;
+    if (!window.confirm('Delete this support ticket and all of its messages?')) return;
+    try {
+      await adminHttpClient.del(`/admin/support/tickets/${activeId}`);
+      setSelectedId(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'support-tickets'] });
+      showToast('Ticket deleted');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to delete ticket');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!activeId) return;
+    try {
+      await adminHttpClient.del(`/admin/support/tickets/${activeId}/messages/${messageId}`);
+      await Promise.all([
+        refetchDetail(),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'support-tickets'] }),
+      ]);
+      showToast('Message deleted');
+    } catch (err) {
+      showToast(err instanceof ApiClientError ? err.message : 'Unable to delete message');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -118,16 +217,21 @@ export const ComplaintsPage: React.FC = () => {
             Real-time two-way support inbox for Customers, Riders &amp; Restaurant Owners (auto-syncs every 3s).
           </p>
         </div>
-        <Tabs
-          items={[
-            { key: 'all', label: `All (${tickets.length})` },
-            { key: 'open', label: `Open (${tickets.filter((t) => t.status === 'open').length})` },
-            { key: 'in_progress', label: `In Progress (${tickets.filter((t) => t.status === 'in_progress').length})` },
-            { key: 'resolved', label: `Resolved (${tickets.filter((t) => t.status === 'resolved').length})` },
-          ]}
-          activeKey={filter}
-          onChange={(k) => setFilter(k as 'all' | 'open' | 'in_progress' | 'resolved')}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Tabs
+            items={[
+              { key: 'all', label: `All (${tickets.length})` },
+              { key: 'open', label: `Open (${tickets.filter((t) => t.status === 'open').length})` },
+              { key: 'in_progress', label: `In Progress (${tickets.filter((t) => t.status === 'in_progress').length})` },
+              { key: 'resolved', label: `Resolved (${tickets.filter((t) => t.status === 'resolved').length})` },
+            ]}
+            activeKey={filter}
+            onChange={(k) => setFilter(k as 'all' | 'open' | 'in_progress' | 'resolved')}
+          />
+          <PrimaryButton leftIcon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
+            New Ticket
+          </PrimaryButton>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -213,6 +317,12 @@ export const ComplaintsPage: React.FC = () => {
                         {st === detail.ticket.status ? `✓ ${st.replace('_', ' ')}` : st.replace('_', ' ')}
                       </SecondaryButton>
                     ))}
+                    <SecondaryButton leftIcon={<Edit3 size={13} />} onClick={openEditTicket}>
+                      Edit
+                    </SecondaryButton>
+                    <SecondaryButton leftIcon={<Trash2 size={13} />} onClick={() => void handleDeleteTicket()}>
+                      Delete
+                    </SecondaryButton>
                   </div>
                 </div>
 
@@ -246,9 +356,26 @@ export const ComplaintsPage: React.FC = () => {
                         >
                           {m.message}
                         </div>
-                        <span style={{ fontSize: 10.5, color: 'var(--zr-text-secondary)', marginTop: 2 }}>
-                          {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <span style={{ fontSize: 10.5, color: 'var(--zr-text-secondary)' }}>
+                            {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <button
+                            type="button"
+                            title="Delete message"
+                            onClick={() => void handleDeleteMessage(m.id)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#DC2626',
+                              cursor: 'pointer',
+                              padding: 2,
+                              display: 'inline-flex',
+                            }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -284,6 +411,106 @@ export const ComplaintsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Create Ticket Modal */}
+      <Modal
+        open={createOpen}
+        title="Create New Support Ticket"
+        onClose={() => setCreateOpen(false)}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setCreateOpen(false)}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={() => void handleCreateTicket()}>Create &amp; Send</PrimaryButton>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <InputField
+            label="Target User Email (Customer / Rider / Owner — optional)"
+            placeholder="e.g. customer@zestroute.app or catalog-partner@zestroute.app"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Dropdown
+              label="Category"
+              value={newCategory}
+              onChange={(v) => setNewCategory(v as typeof newCategory)}
+              options={[
+                { label: 'General / Other', value: 'other' },
+                { label: 'Missing Food', value: 'missing_food' },
+                { label: 'Wrong Order', value: 'wrong_order' },
+                { label: 'Late Delivery', value: 'late_delivery' },
+                { label: 'Refund / Billing', value: 'refund' },
+              ]}
+            />
+            <Dropdown
+              label="Priority"
+              value={newPriority}
+              onChange={(v) => setNewPriority(v as typeof newPriority)}
+              options={[
+                { label: 'Low', value: 'low' },
+                { label: 'Medium', value: 'medium' },
+                { label: 'High', value: 'high' },
+              ]}
+            />
+          </div>
+          <InputField label="Subject *" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="Ticket subject" />
+          <InputField label="Initial Message *" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Write first message..." />
+        </div>
+      </Modal>
+
+      {/* Edit Ticket Modal */}
+      <Modal
+        open={editOpen}
+        title="Edit Support Ticket"
+        onClose={() => setEditOpen(false)}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setEditOpen(false)}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={() => void handleUpdateTicket()}>Save Changes</PrimaryButton>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <InputField label="Subject *" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
+          <Dropdown
+            label="Category"
+            value={editCategory}
+            onChange={(v) => setEditCategory(v as typeof editCategory)}
+            options={[
+              { label: 'General / Other', value: 'other' },
+              { label: 'Missing Food', value: 'missing_food' },
+              { label: 'Wrong Order', value: 'wrong_order' },
+              { label: 'Late Delivery', value: 'late_delivery' },
+              { label: 'Refund / Billing', value: 'refund' },
+            ]}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Dropdown
+              label="Priority"
+              value={editPriority}
+              onChange={(v) => setEditPriority(v as typeof editPriority)}
+              options={[
+                { label: 'Low', value: 'low' },
+                { label: 'Medium', value: 'medium' },
+                { label: 'High', value: 'high' },
+              ]}
+            />
+            <Dropdown
+              label="Status"
+              value={editStatus}
+              onChange={(v) => setEditStatus(v as typeof editStatus)}
+              options={[
+                { label: 'Open', value: 'open' },
+                { label: 'In Progress', value: 'in_progress' },
+                { label: 'Resolved', value: 'resolved' },
+                { label: 'Closed', value: 'closed' },
+              ]}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

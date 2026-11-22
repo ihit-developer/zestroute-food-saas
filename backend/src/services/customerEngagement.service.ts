@@ -393,6 +393,101 @@ export class CustomerEngagementService {
     return { ...updated, id: String(updated._id) };
   }
 
+  static async adminCreateSupportTicket(
+    adminId: string,
+    input: {
+      userEmail?: string;
+      category?: 'missing_food' | 'wrong_order' | 'late_delivery' | 'refund' | 'other';
+      priority?: 'low' | 'medium' | 'high';
+      subject: string;
+      message: string;
+    }
+  ) {
+    if (!input.subject?.trim() || !input.message?.trim()) {
+      throw new AppError(400, 'INVALID_TICKET', 'Subject and initial message are required');
+    }
+    let targetUserId = adminId;
+    if (input.userEmail?.trim()) {
+      const found = await ProfileModel.findOne({ email: input.userEmail.trim().toLowerCase() }).select('_id').lean();
+      if (!found) {
+        throw new AppError(404, 'USER_NOT_FOUND', `No user found with email ${input.userEmail.trim()}`);
+      }
+      targetUserId = String(found._id);
+    }
+    const ticketNumber = `TKT-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const ticket = await SupportTicketModel.create({
+      ticketNumber,
+      userId: targetUserId,
+      category: input.category ?? 'other',
+      priority: input.priority ?? 'medium',
+      subject: input.subject.trim(),
+      status: 'open',
+      assignedAdminId: adminId,
+    });
+    await SupportMessageModel.create({
+      ticketId: ticket._id,
+      senderId: adminId,
+      senderRole: 'super_admin',
+      message: input.message.trim(),
+    });
+    if (targetUserId !== adminId) {
+      await NotificationModel.create({
+        userId: targetUserId,
+        type: 'support_reply',
+        title: `New Support Message (${ticketNumber})`,
+        body: input.message.trim().slice(0, 120),
+        data: { ticketId: String(ticket._id) },
+      }).catch(() => {});
+    }
+    return { ...ticket.toObject(), id: String(ticket._id) };
+  }
+
+  static async adminUpdateSupportTicket(
+    ticketId: string,
+    input: {
+      subject?: string;
+      category?: 'missing_food' | 'wrong_order' | 'late_delivery' | 'refund' | 'other';
+      priority?: 'low' | 'medium' | 'high';
+      status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+    }
+  ) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    const patch: Record<string, unknown> = {};
+    if (input.subject?.trim()) patch.subject = input.subject.trim();
+    if (input.category) patch.category = input.category;
+    if (input.priority) patch.priority = input.priority;
+    if (input.status) patch.status = input.status;
+
+    const updated = await SupportTicketModel.findByIdAndUpdate(
+      ticketId,
+      { $set: patch },
+      { new: true }
+    ).lean();
+    if (!updated) throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+    return { ...updated, id: String(updated._id) };
+  }
+
+  static async adminDeleteSupportTicket(ticketId: string) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    const deleted = await SupportTicketModel.findByIdAndDelete(ticketId).lean();
+    if (!deleted) throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+    await SupportMessageModel.deleteMany({ ticketId: deleted._id });
+    return { deleted: true, id: ticketId };
+  }
+
+  static async adminDeleteSupportMessage(ticketId: string, messageId: string) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+      throw new AppError(400, 'INVALID_ID', 'Invalid ticket or message ID');
+    }
+    const deleted = await SupportMessageModel.findOneAndDelete({ _id: messageId, ticketId }).lean();
+    if (!deleted) throw new AppError(404, 'MESSAGE_NOT_FOUND', 'Message not found');
+    return { deleted: true, id: messageId };
+  }
+
   static async updateProfile(userId: string, fullName: string) {
     const updated = await ProfileModel.findByIdAndUpdate(
       userId,
