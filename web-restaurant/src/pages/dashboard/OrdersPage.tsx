@@ -739,7 +739,7 @@ export const OrdersPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13.5 }}>
             <div style={{ textAlign: 'center', paddingBottom: 10, borderBottom: '1px dashed var(--zr-border)' }}>
               <strong style={{ fontSize: 17, color: 'var(--zr-primary, #F47B20)' }}>
-                {receiptOrder.restaurantName || 'ZestRoute Kitchen'}
+                {receiptOrder.restaurantName || 'Dastarkhwan Kitchen'}
               </strong>
               <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)', marginTop: 2 }}>
                 {new Date(receiptOrder.createdAt).toLocaleString()}

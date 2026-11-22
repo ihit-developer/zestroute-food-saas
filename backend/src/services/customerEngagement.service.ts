@@ -5,9 +5,12 @@ import {
   CustomerWalletModel,
   DeliveryModel,
   FavoriteModel,
+  FoodImageModel,
+  FoodItemModel,
   NotificationModel,
   OrderModel,
   ProfileModel,
+  RestaurantBranchModel,
   RestaurantModel,
   ReviewModel,
   RiderModel,
@@ -56,25 +59,81 @@ export class CustomerEngagementService {
   }
 
   static async listFavorites(customerId: string) {
-    const favs = await FavoriteModel.find({ customerId }).lean();
+    const favs = await FavoriteModel.find({ customerId }).sort({ createdAt: -1 }).lean();
+    const restIds = favs.filter((f) => f.targetType === 'restaurant').map((f) => f.targetId);
+    const foodIds = favs.filter((f) => f.targetType === 'food_item').map((f) => f.targetId);
+
+    const [restaurants, branches, foods, foodImages] = await Promise.all([
+      restIds.length > 0 ? RestaurantModel.find({ _id: { $in: restIds } }).lean() : Promise.resolve([]),
+      restIds.length > 0 ? RestaurantBranchModel.find({ restaurantId: { $in: restIds } }).lean() : Promise.resolve([]),
+      foodIds.length > 0 ? FoodItemModel.find({ _id: { $in: foodIds } }).lean() : Promise.resolve([]),
+      foodIds.length > 0 ? FoodImageModel.find({ foodItemId: { $in: foodIds }, isPrimary: true }).lean() : Promise.resolve([]),
+    ]);
+
+    const foodRestIds = Array.from(new Set(foods.map((f) => String(f.restaurantId))));
+    const foodRests =
+      foodRestIds.length > 0
+        ? await RestaurantModel.find({ _id: { $in: foodRestIds } }).select('name').lean()
+        : [];
+    const restNameById = new Map(foodRests.map((r) => [String(r._id), r.name]));
+    const branchByRestId = new Map(branches.map((b) => [String(b.restaurantId), b]));
+    const imgByFoodId = new Map(foodImages.map((i) => [String(i.foodItemId), i.url]));
+
     return {
-      restaurants: favs.filter((f) => f.targetType === 'restaurant'),
-      foods: favs.filter((f) => f.targetType === 'food_item'),
+      restaurants: restaurants.map((r) => {
+        const b = branchByRestId.get(String(r._id));
+        return {
+          id: String(r._id),
+          name: r.name,
+          cuisineLabel: r.cuisineTypes.join(' • ') || 'Multi-Cuisine',
+          locationLabel: b ? `${b.area}, ${b.city}` : 'Lahore',
+          logoUrl: r.logoUrl,
+          coverUrl: r.coverUrl,
+          rating: r.ratingAvg,
+          ratingCount: r.ratingCount,
+          deliveryTimeLabel: b ? `${b.prepTimeMins}-${b.prepTimeMins + 10} mins` : '25-35 mins',
+          deliveryFeeMinor: b?.deliveryFeeMinor ?? 12000,
+          minOrderMinor: b?.minOrderMinor ?? 30000,
+          isOpen: b ? !b.isTemporarilyClosed && b.isActive : true,
+        };
+      }),
+      foods: foods.map((f) => ({
+        id: String(f._id),
+        restaurantId: String(f.restaurantId),
+        restaurantName: restNameById.get(String(f.restaurantId)) ?? 'Dastarkhwan Kitchen',
+        name: f.name,
+        description: f.description,
+        imageUrl: imgByFoodId.get(String(f._id)),
+        regularPriceMinor: f.regularPriceMinor,
+        discountPriceMinor: f.discountPriceMinor,
+        rating: f.ratingAvg,
+        prepTimeMins: f.prepTimeMins,
+        isAvailable: f.isAvailable,
+      })),
       recent: [],
     };
   }
 
   static async toggleFavorite(
     customerId: string,
-    targetType: 'restaurant' | 'food_item',
+    targetType: 'restaurant' | 'food_item' | 'food',
     targetId: string
   ) {
-    const existing = await FavoriteModel.findOne({ customerId, targetType, targetId });
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      throw new AppError(400, 'INVALID_TARGET', 'Invalid favorite item ID');
+    }
+    const normalizedType: 'restaurant' | 'food_item' =
+      targetType === 'restaurant' ? 'restaurant' : 'food_item';
+    const existing = await FavoriteModel.findOne({
+      customerId,
+      targetType: normalizedType,
+      targetId,
+    });
     if (existing) {
       await existing.deleteOne();
       return { favorited: false };
     }
-    await FavoriteModel.create({ customerId, targetType, targetId });
+    await FavoriteModel.create({ customerId, targetType: normalizedType, targetId });
     return { favorited: true };
   }
 

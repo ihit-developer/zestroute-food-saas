@@ -50,7 +50,7 @@ export const FinancePage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `zestroute-finance-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `dastarkhwan-finance-report-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -70,9 +70,9 @@ export const FinancePage: React.FC = () => {
           `<tr><td>${r.reference}</td><td>${formatMoney(r.grossMinor)}</td><td>${formatMoney(r.commissionMinor)}</td><td>${formatMoney(r.netMinor)}</td><td>${r.status}</td><td>${r.date}</td></tr>`
       )
       .join('');
-    win.document.write(`<!doctype html><html><head><title>ZestRoute Finance Report</title>
+    win.document.write(`<!doctype html><html><head><title>Dastarkhwan Finance Report</title>
       <style>body{font-family:Arial,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:13px}th{background:#f5f5f5}</style>
-      </head><body><h2>ZestRoute Restaurant Financial Statement</h2>
+      </head><body><h2>Dastarkhwan Restaurant Financial Statement</h2>
       <p>Gross: ${formatMoney(grossTotal)} | Commission: ${formatMoney(commissionTotal)} | Net: ${formatMoney(netTotal)}</p>
       <table><thead><tr><th>Reference</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th><th>Date</th></tr></thead>
       <tbody>${tableRows || '<tr><td colspan="6">No transactions yet</td></tr>'}</tbody></table></body></html>`);
