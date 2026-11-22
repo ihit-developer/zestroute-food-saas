@@ -5,6 +5,7 @@ import {
   DeliveryStatusHistoryModel,
   LoyaltyAccountModel,
   LoyaltyTransactionModel,
+  NotificationModel,
   OrderModel,
   OrderStatusHistoryModel,
   ProfileModel,
@@ -47,7 +48,102 @@ export class RiderService {
     const rider = await this.getApprovedRider(userId);
     rider.isOnline = isOnline;
     await rider.save();
+    if (!isOnline) {
+      // Expire pending unaccepted offers when rider goes offline so they don't hold stale requests
+      await DeliveryAssignmentModel.updateMany(
+        { riderId: rider._id, status: 'offered' },
+        { $set: { status: 'expired' } }
+      ).catch(() => {});
+    }
     return { isOnline: rider.isOnline };
+  }
+
+  /** Haversine distance in km between two [lng, lat] coordinates */
+  private static calcDistanceKm(a?: [number, number] | number[], b?: [number, number] | number[]): number {
+    if (!a || !b || a.length < 2 || b.length < 2) return 2.5;
+    const [lon1, lat1] = a;
+    const [lon2, lat2] = b;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return Number((6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))).toFixed(1));
+  }
+
+  /** Broadcast an awaiting_rider delivery to all Online, Approved, Free riders (ranked closest first) */
+  static async broadcastDeliveryToEligibleRiders(deliveryId: string) {
+    const delivery = await DeliveryModel.findOne({ _id: deliveryId, status: 'awaiting_rider' })
+      .populate('orderId', 'orderNumber')
+      .lean();
+    if (!delivery) return 0;
+
+    // 1. Find all approved & online riders
+    const onlineRiders = await RiderModel.find({ status: 'approved', isOnline: true }).lean();
+    if (onlineRiders.length === 0) return 0;
+
+    // 2. Exclude riders who already have an active delivery
+    const busyDeliveries = await DeliveryModel.find({
+      riderId: { $in: onlineRiders.map((r) => r._id) },
+      status: { $in: ['assigned', 'picked_up', 'on_the_way'] },
+    })
+      .select('riderId')
+      .lean();
+    const busySet = new Set(busyDeliveries.map((d) => String(d.riderId)));
+    const freeRiders = onlineRiders.filter((r) => !busySet.has(String(r._id)));
+    if (freeRiders.length === 0) return 0;
+
+    // 3. Rank by GPS proximity to restaurant pickup
+    const pickupCoords = (delivery.pickupAddressSnapshot as { coordinates?: number[] } | undefined)?.coordinates;
+    const locs = await RiderLocationModel.find({
+      riderId: { $in: freeRiders.map((r) => r._id) },
+    })
+      .sort({ recordedAt: -1 })
+      .lean();
+    const locByRider = new Map<string, number[]>();
+    for (const l of locs) {
+      const k = String(l.riderId);
+      if (!locByRider.has(k) && Array.isArray(l.location?.coordinates)) {
+        locByRider.set(k, l.location.coordinates);
+      }
+    }
+
+    const ranked = freeRiders
+      .map((r) => ({
+        rider: r,
+        distKm: this.calcDistanceKm(locByRider.get(String(r._id)), pickupCoords),
+      }))
+      .sort((a, b) => a.distKm - b.distKm)
+      .slice(0, 10);
+
+    const restName = (delivery.pickupAddressSnapshot as { name?: string } | undefined)?.name ?? 'Restaurant';
+    const orderNum = (delivery.orderId as unknown as { orderNumber?: string } | null)?.orderNumber ?? 'Order';
+    let createdCount = 0;
+
+    for (const { rider } of ranked) {
+      const existing = await DeliveryAssignmentModel.findOne({
+        deliveryId: delivery._id,
+        riderId: rider._id,
+      }).lean();
+      if (!existing) {
+        await DeliveryAssignmentModel.create({
+          deliveryId: delivery._id,
+          riderId: rider._id,
+          status: 'offered',
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        }).catch(() => {});
+        createdCount += 1;
+        await NotificationModel.create({
+          userId: rider.userId,
+          type: 'rider_delivery_offer',
+          title: `New Delivery Request (${orderNum})`,
+          body: `Pickup from ${restName} · Earn PKR ${Math.round((delivery.riderEarningMinor ?? 12000) / 100)} — First to accept!`,
+          data: { deliveryId: String(delivery._id) },
+        }).catch(() => {});
+      }
+    }
+    return createdCount;
   }
 
   static async cancelDeliveryForOrder(orderId: string) {
@@ -221,7 +317,7 @@ export class RiderService {
 
     const order = await OrderModel.findById(orderId)
       .populate('restaurantId', 'name')
-      .populate('branchId', 'name address area city')
+      .populate('branchId', 'name address area city location')
       .lean();
     if (!order) return null;
 
@@ -231,11 +327,16 @@ export class RiderService {
       address?: string;
       area?: string;
       city?: string;
+      location?: { coordinates?: number[] };
     } | null;
 
     const pickupAddress = branch
       ? [branch.address, branch.area, branch.city].filter(Boolean).join(', ')
       : 'Lahore Kitchen';
+
+    const pickupCoords = branch?.location?.coordinates;
+    const dropoffCoords = order.deliveryAddressSnapshot?.coordinates;
+    const estDistanceKm = this.calcDistanceKm(pickupCoords, dropoffCoords);
 
     const created = await DeliveryModel.create({
       orderId: order._id,
@@ -243,22 +344,42 @@ export class RiderService {
       pickupAddressSnapshot: {
         name: rest?.name ?? 'Restaurant',
         address: pickupAddress,
+        coordinates: pickupCoords,
       },
       dropoffAddressSnapshot: order.deliveryAddressSnapshot ?? {
         area: 'Lahore',
         street: '',
         houseNumber: '',
       },
-      distanceMeters: 2800,
+      distanceMeters: Math.max(800, Math.round(estDistanceKm * 1000)),
       riderEarningMinor: Math.max(order.deliveryFeeMinor ?? 12000, 12000),
       tipMinor: order.tipMinor ?? 0,
     }).catch(async () => DeliveryModel.findOne({ orderId }).lean());
+
+    if (created) {
+      await this.broadcastDeliveryToEligibleRiders(String(created._id)).catch(() => {});
+    }
 
     return created;
   }
 
   static async listRequests(userId: string) {
     const rider = await this.getApprovedRider(userId);
+    await this.cleanupStaleRiderDeliveries(rider._id);
+
+    // Rule 1: Offline riders do NOT receive live delivery requests
+    if (!rider.isOnline) {
+      return [];
+    }
+
+    // Rule 2: Riders currently busy on an active delivery do NOT receive conflicting offers
+    const activeCount = await DeliveryModel.countDocuments({
+      riderId: rider._id,
+      status: { $in: ['assigned', 'picked_up', 'on_the_way'] },
+    });
+    if (activeCount > 0) {
+      return [];
+    }
 
     // Auto-dispatch: ensure every active customer order awaiting a rider has a DeliveryModel record
     const activeOrders = await OrderModel.find({
@@ -273,7 +394,7 @@ export class RiderService {
       await this.ensureDeliveryForOrder(String(ord._id)).catch(() => {});
     }
 
-    // Ensure any open awaiting_rider deliveries have a live offer for this rider (unless rejected)
+    // Broadcast open awaiting_rider deliveries to this online & free rider (unless previously declined)
     const openDeliveries = await DeliveryModel.find({ status: 'awaiting_rider' })
       .sort({ createdAt: -1 })
       .limit(15)
@@ -302,17 +423,27 @@ export class RiderService {
       }
     }
 
-    const offers = await DeliveryAssignmentModel.find({
-      riderId: rider._id,
-      status: 'offered',
-      expiresAt: { $gt: new Date() },
-    })
-      .populate({
-        path: 'deliveryId',
-        populate: { path: 'orderId', select: 'orderNumber totalMinor paymentMethod status' },
+    const [offers, onlineFreeRidersCount, riderLoc] = await Promise.all([
+      DeliveryAssignmentModel.find({
+        riderId: rider._id,
+        status: 'offered',
+        expiresAt: { $gt: new Date() },
       })
-      .sort({ createdAt: -1 })
-      .lean();
+        .populate({
+          path: 'deliveryId',
+          populate: {
+            path: 'orderId',
+            select: 'orderNumber totalMinor paymentMethod status customerId',
+            populate: { path: 'customerId', select: 'fullName' },
+          },
+        })
+        .sort({ createdAt: -1 })
+        .lean(),
+      RiderModel.countDocuments({ status: 'approved', isOnline: true }),
+      RiderLocationModel.findOne({ riderId: rider._id }).sort({ recordedAt: -1 }).lean(),
+    ]);
+
+    const riderCoords = riderLoc?.location?.coordinates;
 
     return offers
       .filter((o) => {
@@ -326,25 +457,36 @@ export class RiderService {
           _id: string;
           distanceMeters?: number;
           riderEarningMinor?: number;
-          orderId?: { orderNumber?: string; totalMinor?: number; paymentMethod?: string; status?: string };
-          pickupAddressSnapshot?: { name?: string; address?: string };
-          dropoffAddressSnapshot?: { area?: string; instructions?: string };
+          orderId?: {
+            orderNumber?: string;
+            totalMinor?: number;
+            paymentMethod?: string;
+            status?: string;
+            customerId?: { fullName?: string };
+          };
+          pickupAddressSnapshot?: { name?: string; address?: string; coordinates?: number[] };
+          dropoffAddressSnapshot?: { fullName?: string; area?: string; instructions?: string };
         };
+        const distanceToPickupKm = this.calcDistanceKm(riderCoords, del?.pickupAddressSnapshot?.coordinates);
         return {
           assignmentId: String(o._id),
           deliveryId: String(del?._id ?? ''),
           orderNumber: del?.orderId?.orderNumber ?? 'ORD',
           orderStatus: del?.orderId?.status ?? 'pending',
+          customerName: del?.dropoffAddressSnapshot?.fullName ?? del?.orderId?.customerId?.fullName ?? 'Customer',
           paymentMethod: del?.orderId?.paymentMethod ?? 'cod',
           orderTotalMinor: del?.orderId?.totalMinor ?? 0,
           restaurantName: del?.pickupAddressSnapshot?.name ?? 'Restaurant',
           pickupLocation: del?.pickupAddressSnapshot?.address ?? 'Kitchen Pickup',
           dropoffArea: del?.dropoffAddressSnapshot?.area ?? 'Lahore',
           distanceKm: Number(((del?.distanceMeters ?? 2500) / 1000).toFixed(1)),
+          distanceToPickupKm,
+          onlineRidersCount: Math.max(1, onlineFreeRidersCount),
           estimatedEarningMinor: del?.riderEarningMinor ?? 12000,
           instructions: del?.dropoffAddressSnapshot?.instructions,
         };
-      });
+      })
+      .sort((a, b) => a.distanceToPickupKm - b.distanceToPickupKm);
   }
 
   static async declineAssignment(userId: string, assignmentId: string) {

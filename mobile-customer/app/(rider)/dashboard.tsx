@@ -103,12 +103,15 @@ interface DeliveryRequestItem {
   deliveryId: string;
   orderNumber: string;
   orderStatus?: string;
+  customerName?: string;
   paymentMethod: string;
   orderTotalMinor: number;
   restaurantName: string;
   pickupLocation: string;
   dropoffArea: string;
   distanceKm: number;
+  distanceToPickupKm?: number;
+  onlineRidersCount?: number;
   estimatedEarningMinor: number;
   instructions?: string;
 }
@@ -245,7 +248,7 @@ export default function UnifiedRiderDashboardScreen() {
     void loadAll(false);
     const timer = setInterval(() => {
       void loadAll(true);
-    }, 6000);
+    }, 3000);
     return () => clearInterval(timer);
   }, [loadAll]);
 
@@ -1104,20 +1107,59 @@ export default function UnifiedRiderDashboardScreen() {
             </View>
           </View>
         ) : tab === 'requests' ? (
-          /* TAB 2: LIVE DELIVERY REQUESTS */
+          /* TAB 2: LIVE MULTI-RIDER DELIVERY REQUESTS */
           requests.length === 0 ? (
             <EmptyState
-              title="No incoming delivery requests"
-              description={
-                isOnline
-                  ? 'You are online! As soon as Pizza Box or Cheezious marks an order Ready for Pickup, it will appear here.'
-                  : 'Toggle Online above to start receiving nearby restaurant delivery offers.'
+              title={
+                stats.activeDelivery
+                  ? 'Active delivery in progress'
+                  : isOnline
+                    ? 'Listening for live customer orders...'
+                    : 'You are currently Offline'
               }
-              actionLabel="Refresh Queue"
-              onAction={() => void loadAll(false)}
+              description={
+                stats.activeDelivery
+                  ? 'Complete your active delivery first to receive new customer delivery broadcasts.'
+                  : isOnline
+                    ? 'You are Online in the live rider dispatch pool! As soon as any customer places an order, it broadcasts here to nearby online riders (first to accept wins).'
+                    : 'Turn Online above so nearby customer orders broadcast to your phone in real time.'
+              }
+              actionLabel={isOnline ? 'Refresh Queue' : 'Go Online Now'}
+              onAction={() => {
+                if (!isOnline) {
+                  void httpClient
+                    .patch('/rider/online', { isOnline: true })
+                    .then(() => {
+                      setIsOnline(true);
+                      void loadAll(false);
+                      showToast('You are now Online & receiving live requests!', 'success');
+                    })
+                    .catch(() => showToast('Unable to go online', 'error'));
+                } else {
+                  void loadAll(false);
+                }
+              }}
             />
           ) : (
             <View style={{ gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 9,
+                  borderRadius: radii.md,
+                  backgroundColor: 'rgba(22,163,74,0.12)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(22,163,74,0.3)',
+                }}
+              >
+                <Radio size={15} color="#16A34A" />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#15803D', flex: 1 }}>
+                  LIVE MULTI-RIDER DISPATCH · Sorted by closest pickup · First to Accept wins
+                </Text>
+              </View>
               {requests.map((req) => (
                 <View
                   key={req.assignmentId}
@@ -1127,12 +1169,12 @@ export default function UnifiedRiderDashboardScreen() {
                   ]}
                 >
                   <View style={styles.rowBetween}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 16, fontWeight: '800', color: colors.textPrimary }}>
                         {req.restaurantName}
                       </Text>
                       <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                        {req.orderNumber} · {req.paymentMethod.toUpperCase()} ({formatMoney(req.orderTotalMinor)})
+                        {req.orderNumber} · {req.customerName ?? 'Customer'} · {req.paymentMethod.toUpperCase()} ({formatMoney(req.orderTotalMinor)})
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -1151,12 +1193,13 @@ export default function UnifiedRiderDashboardScreen() {
                       <Store size={14} color={colors.primary} />
                       <Text style={{ fontSize: 13, color: colors.textPrimary, flex: 1 }}>
                         Pickup: {req.pickupLocation}
+                        {typeof req.distanceToPickupKm === 'number' ? ` (${req.distanceToPickupKm.toFixed(1)} km away)` : ''}
                       </Text>
                     </View>
                     <View style={styles.row}>
                       <MapPin size={14} color="#16A34A" />
                       <Text style={{ fontSize: 13, color: colors.textPrimary, flex: 1 }}>
-                        Dropoff: {req.dropoffArea}
+                        Dropoff: {req.dropoffArea} ({req.customerName ?? 'Customer'})
                       </Text>
                     </View>
                   </View>

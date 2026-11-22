@@ -284,6 +284,8 @@ export class OrderService {
     await session.endSession();
     const created = await OrderModel.findById(createdOrderId).lean();
     if (created) {
+      // Immediately create & broadcast delivery request to eligible Online, Free riders
+      await RiderService.ensureDeliveryForOrder(String(created._id)).catch(() => {});
       await NotificationModel.create({
         userId: customerId,
         type: 'order_placed',
