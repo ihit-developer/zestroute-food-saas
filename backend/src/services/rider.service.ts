@@ -264,8 +264,16 @@ export class RiderService {
         paymentMethod?: string;
         customerId?: { fullName?: string; phone?: string };
       } | null;
-      const pickup = activeDoc.pickupAddressSnapshot as { name?: string; address?: string } | undefined;
-      const dropoff = activeDoc.dropoffAddressSnapshot as { area?: string; street?: string; houseNumber?: string; instructions?: string } | undefined;
+      const pickup = activeDoc.pickupAddressSnapshot as { name?: string; address?: string; coordinates?: number[] } | undefined;
+      const dropoff = activeDoc.dropoffAddressSnapshot as {
+        area?: string;
+        street?: string;
+        houseNumber?: string;
+        instructions?: string;
+        coordinates?: number[];
+      } | undefined;
+      const pickupCoords = Array.isArray(pickup?.coordinates) && pickup.coordinates.length >= 2 ? pickup.coordinates : [74.3587, 31.5204];
+      const dropoffCoords = Array.isArray(dropoff?.coordinates) && dropoff.coordinates.length >= 2 ? dropoff.coordinates : [74.3487, 31.5104];
       activeDelivery = {
         deliveryId: String(activeDoc._id),
         orderId: String(ord?._id ?? activeDoc.orderId),
@@ -273,8 +281,12 @@ export class RiderService {
         status: activeDoc.status,
         restaurantName: pickup?.name ?? 'Restaurant',
         pickupLocation: pickup?.address ?? 'Kitchen Pickup',
+        pickupLat: pickupCoords[1],
+        pickupLng: pickupCoords[0],
         dropoffArea: dropoff?.area ?? 'Customer Area',
         dropoffAddress: [dropoff?.houseNumber, dropoff?.street, dropoff?.area].filter(Boolean).join(', ') || 'Customer Address',
+        dropoffLat: dropoffCoords[1],
+        dropoffLng: dropoffCoords[0],
         instructions: dropoff?.instructions ?? '',
         customerName: ord?.customerId?.fullName ?? 'Customer',
         customerPhone: ord?.customerId?.phone ?? '',
@@ -465,9 +477,15 @@ export class RiderService {
             customerId?: { fullName?: string };
           };
           pickupAddressSnapshot?: { name?: string; address?: string; coordinates?: number[] };
-          dropoffAddressSnapshot?: { fullName?: string; area?: string; instructions?: string };
+          dropoffAddressSnapshot?: { fullName?: string; area?: string; instructions?: string; coordinates?: number[] };
         };
         const distanceToPickupKm = this.calcDistanceKm(riderCoords, del?.pickupAddressSnapshot?.coordinates);
+        const pCoords = Array.isArray(del?.pickupAddressSnapshot?.coordinates) && del.pickupAddressSnapshot.coordinates.length >= 2
+          ? del.pickupAddressSnapshot.coordinates
+          : [74.3587, 31.5204];
+        const dCoords = Array.isArray(del?.dropoffAddressSnapshot?.coordinates) && del.dropoffAddressSnapshot.coordinates.length >= 2
+          ? del.dropoffAddressSnapshot.coordinates
+          : [74.3487, 31.5104];
         return {
           assignmentId: String(o._id),
           deliveryId: String(del?._id ?? ''),
@@ -478,7 +496,11 @@ export class RiderService {
           orderTotalMinor: del?.orderId?.totalMinor ?? 0,
           restaurantName: del?.pickupAddressSnapshot?.name ?? 'Restaurant',
           pickupLocation: del?.pickupAddressSnapshot?.address ?? 'Kitchen Pickup',
+          pickupLat: pCoords[1],
+          pickupLng: pCoords[0],
           dropoffArea: del?.dropoffAddressSnapshot?.area ?? 'Lahore',
+          dropoffLat: dCoords[1],
+          dropoffLng: dCoords[0],
           distanceKm: Number(((del?.distanceMeters ?? 2500) / 1000).toFixed(1)),
           distanceToPickupKm,
           onlineRidersCount: Math.max(1, onlineFreeRidersCount),

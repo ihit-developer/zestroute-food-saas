@@ -3,7 +3,7 @@
     "name": "Dastarkhwan",
     "slug": "zestroute-customer",
     "owner": "ihtiaws-team",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "scheme": "zestroute",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -21,7 +21,11 @@
     ],
     "android": {
       "package": "com.zestroute.app",
-      "versionCode": 6,
+      "versionCode": 7,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F47B20"

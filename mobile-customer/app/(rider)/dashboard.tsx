@@ -52,6 +52,7 @@ import { httpClient, tokenStorage } from '../../services/apiClient';
 import { saveAccount } from '../../services/savedAccounts';
 import { useAppStore } from '../../store/useAppStore';
 import { playAlertChime } from '../../utils/soundAlert';
+import { LocationPinMap } from '../../components/LocationPinMap';
 
 interface ActiveDeliveryInfo {
   deliveryId: string;
@@ -60,8 +61,12 @@ interface ActiveDeliveryInfo {
   status: 'assigned' | 'picked_up' | 'on_the_way';
   restaurantName: string;
   pickupLocation: string;
+  pickupLat?: number;
+  pickupLng?: number;
   dropoffArea: string;
   dropoffAddress: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
   instructions?: string;
   customerName: string;
   customerPhone: string;
@@ -108,7 +113,11 @@ interface DeliveryRequestItem {
   orderTotalMinor: number;
   restaurantName: string;
   pickupLocation: string;
+  pickupLat?: number;
+  pickupLng?: number;
   dropoffArea: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
   distanceKm: number;
   distanceToPickupKm?: number;
   onlineRidersCount?: number;
@@ -658,11 +667,17 @@ export default function UnifiedRiderDashboardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => openGoogleMapsNav(activeDel.dropoffAddress)}
+                onPress={() =>
+                  openGoogleMapsNav(
+                    typeof activeDel.dropoffLat === 'number' && typeof activeDel.dropoffLng === 'number'
+                      ? `${activeDel.dropoffLat},${activeDel.dropoffLng}`
+                      : activeDel.dropoffAddress
+                  )
+                }
                 style={[styles.quickActionPill, { backgroundColor: 'rgba(22,163,74,0.12)', borderColor: '#16A34A' }]}
               >
                 <Navigation size={13} color="#16A34A" />
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#16A34A' }}>Nav Customer</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#16A34A' }}>Nav Customer Pin</Text>
               </Pressable>
 
               {activeDel.customerPhone ? (
@@ -686,6 +701,20 @@ export default function UnifiedRiderDashboardScreen() {
                 </Text>
               </Pressable>
             </View>
+
+            {/* Live Interactive Map Showing Restaurant Pickup -> Customer Pinned Location */}
+            {typeof activeDel.dropoffLat === 'number' && typeof activeDel.dropoffLng === 'number' ? (
+              <LocationPinMap
+                mode="route"
+                latitude={activeDel.dropoffLat}
+                longitude={activeDel.dropoffLng}
+                pickupLat={activeDel.pickupLat}
+                pickupLng={activeDel.pickupLng}
+                pickupLabel={activeDel.restaurantName}
+                dropoffLabel={`${activeDel.customerName} (${activeDel.dropoffArea})`}
+                height={200}
+              />
+            ) : null}
 
             {activeDel.status === 'assigned' ? (
               <PrimaryButton
@@ -1201,6 +1230,15 @@ export default function UnifiedRiderDashboardScreen() {
                       <Text style={{ fontSize: 13, color: colors.textPrimary, flex: 1 }}>
                         Dropoff: {req.dropoffArea} ({req.customerName ?? 'Customer'})
                       </Text>
+                      {typeof req.dropoffLat === 'number' && typeof req.dropoffLng === 'number' ? (
+                        <Pressable
+                          onPress={() => openGoogleMapsNav(`${req.dropoffLat},${req.dropoffLng}`)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                        >
+                          <Navigation size={12} color="#16A34A" />
+                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#16A34A' }}>Map Pin</Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                   </View>
 

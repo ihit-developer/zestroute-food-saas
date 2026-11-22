@@ -16,6 +16,7 @@ import {
 } from '../../components/ui';
 import { useAppStore } from '../../store/useAppStore';
 import { API_BASE_URL, httpClient, tokenStorage } from '../../services/apiClient';
+import { LocationPinMap } from '../../components/LocationPinMap';
 
 const PAYMENT_METHODS = [
   { key: 'cod', label: 'Cash on Delivery', Icon: Banknote },
@@ -48,6 +49,8 @@ export default function CheckoutScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pinnedLat, setPinnedLat] = useState<number>(selectedAddress?.latitude ?? 31.5204);
+  const [pinnedLng, setPinnedLng] = useState<number>(selectedAddress?.longitude ?? 74.3587);
 
   const isOnlinePayment =
     paymentMethod === 'jazzcash' || paymentMethod === 'easypaisa' || paymentMethod === 'card';
@@ -180,6 +183,8 @@ export default function CheckoutScreen() {
           paymentMethod,
           tipMinor,
           deliveryInstructions: instructions.trim() || undefined,
+          pinnedLatitude: pinnedLat,
+          pinnedLongitude: pinnedLng,
         }),
       });
       const json = (await res.json()) as {
@@ -268,6 +273,19 @@ export default function CheckoutScreen() {
               : 'Uses your default saved address (tap to change)'}
           </Text>
         </Pressable>
+
+        {/* Interactive Customer Live Location Pin Map (sent directly to Rider) */}
+        <LocationPinMap
+          mode="picker"
+          latitude={pinnedLat}
+          longitude={pinnedLng}
+          height={210}
+          onPinChange={({ latitude, longitude }) => {
+            setPinnedLat(latitude);
+            setPinnedLng(longitude);
+            showToast('Live doorstep pin updated for your rider!', 'success');
+          }}
+        />
 
         <InputField
           label="Delivery Instructions"

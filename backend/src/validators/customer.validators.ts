@@ -47,6 +47,8 @@ export const createOrderSchema = z.object({
   paymentMethod: z.enum(['cod', 'jazzcash', 'easypaisa', 'card', 'wallet']),
   tipMinor: z.number().int().min(0).max(500_000).default(0),
   deliveryInstructions: z.string().trim().max(300).optional(),
+  pinnedLatitude: z.number().min(-90).max(90).optional(),
+  pinnedLongitude: z.number().min(-180).max(180).optional(),
 });
 
 export const cancelOrderSchema = z.object({

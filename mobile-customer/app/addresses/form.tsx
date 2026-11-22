@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, MapPin } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useTheme } from '../../hooks/useTheme';
 import {
   IconButton,
@@ -14,6 +14,7 @@ import {
   TopNav,
   useToast,
 } from '../../components/ui';
+import { LocationPinMap } from '../../components/LocationPinMap';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '@zestroute/shared';
 import { addressSchema } from '../../features/validation/authSchemas';
@@ -40,6 +41,8 @@ export default function AddressFormScreen() {
   const { showToast } = useToast();
   const setSelectedAddress = useAppStore((s) => s.setSelectedAddress);
   const [labelType, setLabelType] = useState<'home' | 'office' | 'other'>('home');
+  const [pinLat, setPinLat] = useState(31.5204);
+  const [pinLng, setPinLng] = useState(74.3587);
 
   const {
     control,
@@ -72,8 +75,8 @@ export default function AddressFormScreen() {
         building: values.building?.trim() || undefined,
         landmark: values.landmark?.trim() || undefined,
         deliveryInstructions: values.deliveryInstructions?.trim() || undefined,
-        latitude: 31.5102,
-        longitude: 74.3587,
+        latitude: pinLat,
+        longitude: pinLng,
         isDefault: true,
       });
       setSelectedAddress({
@@ -85,8 +88,8 @@ export default function AddressFormScreen() {
         area: values.area.trim(),
         street: values.street.trim(),
         houseNumber: values.houseNumber.trim(),
-        latitude: 31.5102,
-        longitude: 74.3587,
+        latitude: pinLat,
+        longitude: pinLng,
         isDefault: true,
       });
       await queryClient.invalidateQueries({ queryKey: ['customer', 'addresses'] });
@@ -112,12 +115,20 @@ export default function AddressFormScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={[styles.mapPlaceholder, { backgroundColor: colors.skeletonBase, borderRadius: radii.lg }]}>
-          <MapPin size={28} color={colors.primary} />
-          <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-            Interactive Map Pin Selector (Lat/Lng)
-          </Text>
-        </View>
+        <LocationPinMap
+          mode="picker"
+          latitude={pinLat}
+          longitude={pinLng}
+          height={230}
+          onPinChange={({ latitude, longitude, city, area, street }) => {
+            setPinLat(latitude);
+            setPinLng(longitude);
+            if (city) setValue('city', city);
+            if (area) setValue('area', area);
+            if (street) setValue('street', street);
+            showToast('Live location pinned on map!', 'success');
+          }}
+        />
 
         <Tabs
           items={[

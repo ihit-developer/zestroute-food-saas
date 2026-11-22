@@ -42,6 +42,8 @@ export class OrderService {
       paymentMethod: 'cod' | 'jazzcash' | 'easypaisa' | 'card' | 'wallet';
       tipMinor: number;
       deliveryInstructions?: string;
+      pinnedLatitude?: number;
+      pinnedLongitude?: number;
     }
   ) {
     if (!idempotencyKey?.trim()) {
@@ -164,7 +166,10 @@ export class OrderService {
               area: address.area,
               street: address.street,
               houseNumber: address.houseNumber,
-              coordinates: address.location?.coordinates ?? [0, 0],
+              coordinates:
+                typeof input.pinnedLatitude === 'number' && typeof input.pinnedLongitude === 'number'
+                  ? [input.pinnedLongitude, input.pinnedLatitude]
+                  : address.location?.coordinates ?? [74.3587, 31.5204],
               instructions: input.deliveryInstructions ?? address.deliveryInstructions,
             },
             status: 'pending',
