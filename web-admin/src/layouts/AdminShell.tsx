@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -38,9 +38,29 @@ export const AdminShell: React.FC = () => {
   const { showToast } = useToast();
   const [collapsed, setCollapsed] = useState(false);
   const { theme, locale, toggleTheme, toggleLocale } = useAdminStore();
+  const hasToken = Boolean(adminTokenStorage.getAccessToken());
+
+  // Verify live Super Admin token — if expired or non-admin, force sign in first
+  useEffect(() => {
+    if (!hasToken) return;
+    adminAuthApi
+      .me()
+      .then((me) => {
+        if (!me.roles.includes('super_admin')) {
+          adminTokenStorage.clearTokens();
+          queryClient.clear();
+          navigate('/login', { replace: true });
+        }
+      })
+      .catch(() => {
+        adminTokenStorage.clearTokens();
+        queryClient.clear();
+        navigate('/login', { replace: true });
+      });
+  }, [hasToken, navigate, queryClient]);
 
   // Enforce Super Admin authentication before loading protected tabs
-  if (!adminTokenStorage.getAccessToken()) {
+  if (!hasToken) {
     return <Navigate to="/login" replace />;
   }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovalStatus } from '@zestroute/shared';
 import {
@@ -41,9 +41,22 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
   const { theme, locale, toggleTheme, toggleLocale, restaurantId, restaurantName, setRestaurantContext } =
     useRestaurantStore();
 
+  const hasToken = Boolean(restaurantTokenStorage.getAccessToken());
+
+  // Verify live session token — if missing/expired/invalid, force redirect to /login
   useEffect(() => {
-    const token = restaurantTokenStorage.getAccessToken();
-    if (!token) return;
+    if (!hasToken) return;
+    restaurantAuthApi
+      .me()
+      .catch(() => {
+        restaurantTokenStorage.clearTokens();
+        queryClient.clear();
+        navigate('/login', { replace: true });
+      });
+  }, [hasToken, navigate, queryClient]);
+
+  useEffect(() => {
+    if (!hasToken) return;
     restaurantHttpClient
       .get<Array<{ id: string; name: string; status: ApprovalStatus }>>('/restaurant/mine')
       .then((mine) => {
@@ -59,7 +72,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
         }
       })
       .catch(() => {});
-  }, [queryClient, restaurantId, restaurantName, setRestaurantContext]);
+  }, [hasToken, queryClient, restaurantId, restaurantName, setRestaurantContext]);
 
   const navItems: NavItem[] = [
     { key: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -101,6 +114,11 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
 
   const activeKey =
     navItems.find((i) => location.pathname.startsWith(i.key))?.key ?? '/dashboard';
+
+  // Enforce Restaurant Partner login first whenever opening any portal link without a session
+  if (!hasToken) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="zr-shell">
