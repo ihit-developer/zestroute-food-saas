@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,6 +7,8 @@ import { MapPin, ShoppingBag, Store } from 'lucide-react-native';
 import { useTheme } from '../hooks/useTheme';
 import { PrimaryButton } from '../components/ui';
 import { useAppStore } from '../store/useAppStore';
+
+const APP_LOGO = require('../assets/icon.png');
 
 const SLIDES = [
   {
@@ -48,6 +50,12 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <View style={styles.topRow}>
+        <View style={styles.brandRow}>
+          <Image source={APP_LOGO} style={styles.brandIcon} resizeMode="cover" />
+          <Text style={[styles.brandName, { color: colors.textPrimary }]}>
+            Dastar<Text style={{ color: colors.primary }}>khwan</Text>
+          </Text>
+        </View>
         <Pressable onPress={finishOnboarding} hitSlop={10}>
           <Text style={[styles.skip, { color: colors.textSecondary }]}>Skip</Text>
         </Pressable>
@@ -95,7 +103,10 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, padding: 24, justifyContent: 'space-between' },
-  topRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandIcon: { width: 34, height: 34, borderRadius: 10 },
+  brandName: { fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
   skip: { fontSize: 15, fontWeight: '600' },
   center: { alignItems: 'center', gap: 18, paddingHorizontal: 8 },
   illustration: { width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

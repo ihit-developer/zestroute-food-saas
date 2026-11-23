@@ -45,6 +45,7 @@ export const PrimaryButton: React.FC<MobileButtonProps> = ({
           borderRadius: radii.md,
           opacity: isDisabled ? 0.55 : 1,
           width: fullWidth ? '100%' : undefined,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
         },
         shadows.sm.native,
         style,
@@ -90,6 +91,7 @@ export const SecondaryButton: React.FC<MobileButtonProps> = ({
           borderRadius: radii.md,
           opacity: isDisabled ? 0.55 : 1,
           width: fullWidth ? '100%' : undefined,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
         },
         style,
       ]}
@@ -128,6 +130,7 @@ export const IconButton: React.FC<{
           borderColor: colors.border,
           borderRadius: radii.md,
           opacity: disabled ? 0.55 : 1,
+          transform: [{ scale: pressed ? 0.94 : 1 }],
         },
         style,
       ]}

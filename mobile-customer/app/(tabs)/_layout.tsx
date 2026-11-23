@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight, Compass, Heart, Home, Receipt, ShoppingCart, User } from 'lucide-react-native';
 import { formatMoney } from '@zestroute/shared';
 import { useTheme } from '../../hooks/useTheme';
@@ -8,12 +9,15 @@ import { useAppStore } from '../../store/useAppStore';
 
 export default function TabsLayout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, radii } = useTheme();
   const cartItems = useAppStore((s) => s.cartItems);
   const cartRestaurantName = useAppStore((s) => s.cartRestaurantName);
 
   const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0);
   const cartTotalMinor = cartItems.reduce((sum, i) => sum + i.unitPriceMinor * i.quantity, 0);
+  const bottomInset = Math.max(insets.bottom, 8);
+  const tabBarHeight = 56 + bottomInset;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -25,8 +29,8 @@ export default function TabsLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 62,
-            paddingBottom: 8,
+            height: tabBarHeight,
+            paddingBottom: bottomInset,
             paddingTop: 6,
           },
           tabBarLabelStyle: {
@@ -78,7 +82,7 @@ export default function TabsLayout() {
           onPress={() => router.push('/cart')}
           style={[
             styles.floatingCart,
-            { backgroundColor: colors.primary, borderRadius: radii.lg },
+            { backgroundColor: colors.primary, borderRadius: radii.lg, bottom: tabBarHeight + 10 },
           ]}
         >
           <View style={styles.leftRow}>

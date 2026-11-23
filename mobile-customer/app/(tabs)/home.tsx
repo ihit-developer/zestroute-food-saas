@@ -304,12 +304,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 16, gap: 16, paddingBottom: 110 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  addressBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pinBadge: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  addressBtn: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pinBadge: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   rowCenter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  addressText: { fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addressText: { fontSize: 14.5, fontWeight: '700', flexShrink: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   cartBtn: {
     height: 44,
     paddingHorizontal: 12,
