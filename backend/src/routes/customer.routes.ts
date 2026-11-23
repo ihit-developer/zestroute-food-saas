@@ -354,7 +354,14 @@ customerRouter.patch('/notifications/read-all', ...customerAuth, async (req, res
 
 customerRouter.get('/support/tickets', authenticate, async (req, res, next) => {
   try {
-    const data = await CustomerEngagementService.listSupportTickets(req.auth!.userId);
+    const roles = req.auth!.roles ?? [];
+    const viewerRole = roles.includes('restaurant_owner') || roles.includes('restaurant_staff')
+      ? 'restaurant_owner'
+      : roles.includes('rider')
+        ? 'rider'
+        : 'customer';
+    const restaurantId = typeof req.query.restaurantId === 'string' ? req.query.restaurantId : undefined;
+    const data = await CustomerEngagementService.listSupportTickets(req.auth!.userId, viewerRole, restaurantId);
     res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
@@ -378,11 +385,11 @@ customerRouter.post('/support/tickets', authenticate, validateBody(createSupport
 
 customerRouter.get('/support/tickets/:ticketId', authenticate, async (req, res, next) => {
   try {
-    const isAdmin = (req.auth!.roles ?? []).includes('super_admin');
+    const roles = req.auth!.roles ?? [];
     const data = await CustomerEngagementService.getSupportTicketDetail(
       String(req.params.ticketId),
       req.auth!.userId,
-      isAdmin
+      roles
     );
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -407,6 +414,51 @@ customerRouter.post('/support/tickets/:ticketId/messages', authenticate, async (
       String(req.body?.message ?? '')
     );
     res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.post('/support/tickets/:ticketId/escalate', authenticate, async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.escalateSupportTicket(
+      String(req.params.ticketId),
+      req.auth!.userId
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.post('/support/tickets/:ticketId/rate', authenticate, async (req, res, next) => {
+  try {
+    const rating = Number(req.body?.rating);
+    const feedback = typeof req.body?.feedback === 'string' ? req.body.feedback : undefined;
+    const data = await CustomerEngagementService.rateSupportTicket(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      rating,
+      feedback
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.patch('/support/tickets/:ticketId/status', authenticate, async (req, res, next) => {
+  try {
+    const roles = req.auth!.roles ?? [];
+    const allowed = ['open', 'in_progress', 'resolved', 'closed'] as const;
+    const status = allowed.includes(req.body?.status) ? req.body.status : 'resolved';
+    const data = await CustomerEngagementService.updateSupportTicketStatusByActor(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      roles,
+      status
+    );
+    res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
   }

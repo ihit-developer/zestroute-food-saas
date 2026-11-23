@@ -248,6 +248,7 @@ export interface AdminNavItem {
   key: string;
   label: string;
   icon: React.ReactNode;
+  badge?: number;
 }
 
 export const AdminSidebar: React.FC<{
@@ -305,7 +306,7 @@ export const AdminSidebar: React.FC<{
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: showLabel ? 'flex-start' : 'center',
+                justifyContent: showLabel ? 'space-between' : 'center',
                 gap: 10,
                 padding: '10px 12px',
                 borderRadius: 10,
@@ -317,8 +318,30 @@ export const AdminSidebar: React.FC<{
                 fontSize: 13.5,
               }}
             >
-              {item.icon}
-              {showLabel && <span>{item.label}</span>}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                {item.icon}
+                {showLabel && <span>{item.label}</span>}
+              </span>
+              {showLabel && item.badge && item.badge > 0 ? (
+                <span
+                  style={{
+                    minWidth: 20,
+                    height: 20,
+                    borderRadius: 999,
+                    background: '#EF4444',
+                    color: '#FFFFFF',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 6px',
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              ) : null}
             </button>
           );
         })}

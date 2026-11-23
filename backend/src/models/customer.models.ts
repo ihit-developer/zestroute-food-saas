@@ -61,6 +61,10 @@ const supportTicketSchema = new Schema(
     ticketNumber: { type: String, required: true },
     userId: { type: Schema.Types.ObjectId, ref: 'Profile', required: true },
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
+    restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant' },
+    targetType: { type: String, enum: ['restaurant', 'admin'], default: 'admin' },
+    escalatedToAdmin: { type: Boolean, default: false },
+    escalatedAt: { type: Date },
     category: {
       type: String,
       enum: ['missing_food', 'wrong_order', 'late_delivery', 'refund', 'other'],
@@ -70,11 +74,17 @@ const supportTicketSchema = new Schema(
     status: { type: String, enum: ['open', 'in_progress', 'resolved', 'closed'], default: 'open' },
     priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
     assignedAdminId: { type: Schema.Types.ObjectId, ref: 'Profile' },
+    lastReadByCustomerAt: { type: Date },
+    lastReadByRestaurantAt: { type: Date },
+    lastReadByAdminAt: { type: Date },
+    rating: { type: Number, min: 1, max: 5 },
+    ratingFeedback: { type: String },
   },
   { timestamps: true, collection: 'support_tickets' }
 );
 supportTicketSchema.index({ ticketNumber: 1 }, { unique: true });
 supportTicketSchema.index({ userId: 1, status: 1, createdAt: -1 });
+supportTicketSchema.index({ restaurantId: 1, targetType: 1, updatedAt: -1 });
 
 // 56. support_messages
 const supportMessageSchema = new Schema(

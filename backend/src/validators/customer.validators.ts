@@ -65,7 +65,10 @@ export const createReviewSchema = z.object({
 
 export const createSupportTicketSchema = z.object({
   orderId: z.string().min(12).optional(),
+  orderNumber: z.string().trim().max(40).optional(),
+  restaurantId: z.string().min(12).optional(),
+  targetType: z.enum(['restaurant', 'admin']).optional(),
   category: z.enum(['missing_food', 'wrong_order', 'late_delivery', 'refund', 'other']),
-  subject: z.string().trim().min(4).max(150),
-  message: z.string().trim().min(5).max(2000),
+  subject: z.string().trim().min(3).max(150),
+  message: z.string().trim().min(2).max(2000),
 });

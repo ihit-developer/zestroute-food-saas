@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   BarChart3,
@@ -29,8 +29,9 @@ import {
 } from 'lucide-react';
 import { AdminSidebar, IconButton, SecondaryButton, useToast, type AdminNavItem } from '../components/ui/AdminUI';
 import { useAdminStore } from '../store/useAdminStore';
-import { adminAuthApi, adminTokenStorage } from '../services/apiClient';
+import { adminAuthApi, adminHttpClient, adminTokenStorage } from '../services/apiClient';
 import { AdminLiveOrderPopup } from '../components/AdminLiveOrderPopup';
+import { AdminLiveSupportPopup } from '../components/AdminLiveSupportPopup';
 
 export const AdminShell: React.FC = () => {
   const navigate = useNavigate();
@@ -61,6 +62,14 @@ export const AdminShell: React.FC = () => {
       });
   }, [hasToken, navigate, queryClient]);
 
+  const { data: supportRows = [] } = useQuery<Array<{ unreadCount?: number }>>({
+    queryKey: ['admin', 'support-tickets'],
+    enabled: hasToken,
+    refetchInterval: 4000,
+    queryFn: () => adminHttpClient.get<Array<{ unreadCount?: number }>>('/admin/support/tickets'),
+  });
+  const supportUnread = supportRows.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
+
   // Enforce Super Admin authentication before loading protected tabs
   if (!hasToken) {
     return <Navigate to="/login" replace />;
@@ -81,7 +90,12 @@ export const AdminShell: React.FC = () => {
     { key: '/commissions', label: 'Commissions', icon: <Percent size={17} /> },
     { key: '/payments', label: 'Payments', icon: <CreditCard size={17} /> },
     { key: '/refunds', label: 'Refunds & Disputes', icon: <RotateCcw size={17} /> },
-    { key: '/complaints', label: 'Live Support & Chat', icon: <MessageSquareWarning size={17} /> },
+    {
+      key: '/complaints',
+      label: 'Live Support & Chat',
+      icon: <MessageSquareWarning size={17} />,
+      badge: supportUnread > 0 ? supportUnread : undefined,
+    },
     { key: '/analytics', label: 'Analytics & Reports', icon: <BarChart3 size={17} /> },
     { key: '/audit-logs', label: 'Audit Logs', icon: <Activity size={17} /> },
     { key: '/settings', label: 'Platform Settings', icon: <Settings size={17} /> },
@@ -112,6 +126,7 @@ export const AdminShell: React.FC = () => {
 
       <div className="zr-main">
         <AdminLiveOrderPopup />
+        <AdminLiveSupportPopup />
         <header className="zr-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <div className="zr-mobile-only" style={{ flexShrink: 0 }}>

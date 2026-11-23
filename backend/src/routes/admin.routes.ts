@@ -460,7 +460,7 @@ adminRouter.get('/support/tickets/:ticketId', async (req, res, next) => {
     const data = await CustomerEngagementService.getSupportTicketDetail(
       String(req.params.ticketId),
       req.auth!.userId,
-      true
+      ['super_admin']
     );
     res.status(200).json({ success: true, data });
   } catch (err) {

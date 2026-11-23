@@ -8,6 +8,7 @@ import {
   FoodImageModel,
   FoodItemModel,
   NotificationModel,
+  OrderItemModel,
   OrderModel,
   ProfileModel,
   RestaurantBranchModel,
@@ -233,29 +234,164 @@ export class CustomerEngagementService {
     return { updated: true };
   }
 
-  static async listSupportTickets(userId: string) {
-    const tickets = await SupportTicketModel.find({ userId }).sort({ updatedAt: -1, createdAt: -1 }).lean();
-    const ticketIds = tickets.map((t) => t._id);
-    const messages = await SupportMessageModel.find({ ticketId: { $in: ticketIds } })
-      .sort({ createdAt: -1 })
+  private static async buildOrderSummaryMap(orderIds: mongoose.Types.ObjectId[]) {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        orderNumber: string;
+        restaurantId: string;
+        restaurantName: string;
+        status: string;
+        totalMinor: number;
+        paymentMethod: string;
+        itemsSummary: string;
+        createdAt: string;
+      }
+    >();
+    if (orderIds.length === 0) return map;
+
+    const orders = await OrderModel.find({ _id: { $in: orderIds } })
+      .populate('restaurantId', 'name')
       .lean();
+    const items = await OrderItemModel.find({ orderId: { $in: orderIds } }).lean();
+    const itemsByOrder = new Map<string, string[]>();
+    for (const it of items) {
+      const k = String(it.orderId);
+      const arr = itemsByOrder.get(k) ?? [];
+      arr.push(`${it.quantity}x ${it.nameSnapshot}`);
+      itemsByOrder.set(k, arr);
+    }
+    for (const o of orders) {
+      const rest = o.restaurantId as unknown as { _id?: unknown; name?: string } | null;
+      const k = String(o._id);
+      map.set(k, {
+        id: k,
+        orderNumber: o.orderNumber,
+        restaurantId: String(rest?._id ?? o.restaurantId ?? ''),
+        restaurantName: rest?.name ?? 'Restaurant',
+        status: o.status,
+        totalMinor: o.totalMinor,
+        paymentMethod: o.paymentMethod,
+        itemsSummary: (itemsByOrder.get(k) ?? []).join(', ') || 'Food Order',
+        createdAt: String(o.createdAt),
+      });
+    }
+    return map;
+  }
+
+  private static async canRestaurantAccessTicket(
+    actorId: string,
+    ticketRestaurantId?: mongoose.Types.ObjectId | null
+  ): Promise<boolean> {
+    if (!ticketRestaurantId) return false;
+    const owned = await RestaurantModel.findOne({ _id: ticketRestaurantId, ownerId: actorId })
+      .select('_id')
+      .lean();
+    return Boolean(owned);
+  }
+
+  static async listSupportTickets(
+    userId: string,
+    viewerRole: 'customer' | 'rider' | 'restaurant_owner' = 'customer',
+    activeRestaurantId?: string
+  ) {
+    let query: Record<string, unknown> = { userId };
+    let ownedRestIds: mongoose.Types.ObjectId[] = [];
+
+    if (viewerRole === 'restaurant_owner') {
+      const ownedRests = await RestaurantModel.find({ ownerId: userId }).select('_id').lean();
+      ownedRestIds = ownedRests.map((r) => r._id);
+      const targetRestIds =
+        activeRestaurantId && mongoose.Types.ObjectId.isValid(activeRestaurantId)
+          ? ownedRestIds.filter((id) => String(id) === activeRestaurantId)
+          : ownedRestIds;
+      query = {
+        $or: [
+          { userId },
+          ...(targetRestIds.length > 0
+            ? [{ restaurantId: { $in: targetRestIds }, targetType: 'restaurant' }]
+            : []),
+        ],
+      };
+    }
+
+    const tickets = await SupportTicketModel.find(query)
+      .populate('userId', 'fullName email phone')
+      .populate('restaurantId', 'name')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(120)
+      .lean();
+
+    const ticketIds = tickets.map((t) => t._id);
+    const orderIds = tickets
+      .map((t) => t.orderId)
+      .filter((id): id is mongoose.Types.ObjectId => Boolean(id));
+    const [messages, orderMap] = await Promise.all([
+      SupportMessageModel.find({ ticketId: { $in: ticketIds } }).sort({ createdAt: -1 }).lean(),
+      this.buildOrderSummaryMap(orderIds),
+    ]);
+
     const lastByTicket = new Map<string, { message: string; senderRole: string; createdAt: Date }>();
     const countByTicket = new Map<string, number>();
+    const msgsByTicket = new Map<string, Array<{ senderRole: string; createdAt: Date }>>();
     for (const m of messages) {
       const k = String(m.ticketId);
       countByTicket.set(k, (countByTicket.get(k) ?? 0) + 1);
+      const list = msgsByTicket.get(k) ?? [];
+      list.push({ senderRole: m.senderRole, createdAt: m.createdAt });
+      msgsByTicket.set(k, list);
       if (!lastByTicket.has(k)) {
         lastByTicket.set(k, { message: m.message, senderRole: m.senderRole, createdAt: m.createdAt });
       }
     }
+
     return tickets.map((t) => {
-      const last = lastByTicket.get(String(t._id));
+      const idStr = String(t._id);
+      const last = lastByTicket.get(idStr);
+      const u = t.userId as unknown as { _id?: unknown; fullName?: string; email?: string; phone?: string } | null;
+      const rest = t.restaurantId as unknown as { _id?: unknown; name?: string } | null;
+      const isCustomerChatForRestaurant =
+        viewerRole === 'restaurant_owner' && String(u?._id ?? t.userId) !== userId;
+
+      const lastReadAt =
+        viewerRole === 'restaurant_owner'
+          ? t.lastReadByRestaurantAt
+          : t.lastReadByCustomerAt;
+      const unreadCount = (msgsByTicket.get(idStr) ?? []).filter((m) => {
+        const isFromMe =
+          viewerRole === 'restaurant_owner'
+            ? m.senderRole === 'restaurant_owner'
+            : m.senderRole === viewerRole;
+        if (isFromMe) return false;
+        if (!lastReadAt) return true;
+        return new Date(m.createdAt).getTime() > new Date(lastReadAt).getTime();
+      }).length;
+
       return {
-        ...t,
-        id: String(t._id),
-        messageCount: countByTicket.get(String(t._id)) ?? 0,
+        id: idStr,
+        ticketNumber: t.ticketNumber,
+        category: t.category,
+        subject: t.subject,
+        status: t.status,
+        priority: t.priority,
+        targetType: t.targetType ?? 'admin',
+        channel: isCustomerChatForRestaurant ? 'customer_chat' : 'admin_support',
+        restaurantId: rest?._id ? String(rest._id) : t.restaurantId ? String(t.restaurantId) : undefined,
+        restaurantName: rest?.name ?? undefined,
+        escalatedToAdmin: Boolean(t.escalatedToAdmin),
+        rating: t.rating ?? undefined,
+        ratingFeedback: t.ratingFeedback ?? undefined,
+        userName: u?.fullName ?? 'User',
+        userEmail: u?.email ?? '',
+        userPhone: u?.phone ?? '',
+        orderSummary: t.orderId ? orderMap.get(String(t.orderId)) : undefined,
+        messageCount: countByTicket.get(idStr) ?? 0,
+        unreadCount,
         lastMessage: last?.message ?? '',
         lastSenderRole: last?.senderRole ?? '',
+        createdAt: String(t.createdAt),
+        updatedAt: String(t.updatedAt),
       };
     });
   }
@@ -264,19 +400,59 @@ export class CustomerEngagementService {
     userId: string,
     input: {
       orderId?: string;
+      orderNumber?: string;
+      restaurantId?: string;
+      targetType?: 'restaurant' | 'admin';
       category: 'missing_food' | 'wrong_order' | 'late_delivery' | 'refund' | 'other';
       subject: string;
       message: string;
     },
     senderRole = 'customer'
   ) {
+    let resolvedOrderId: mongoose.Types.ObjectId | undefined;
+    let resolvedRestaurantId: mongoose.Types.ObjectId | undefined;
+
+    if (input.orderId && mongoose.Types.ObjectId.isValid(input.orderId)) {
+      const ord = await OrderModel.findById(input.orderId).select('_id restaurantId').lean();
+      if (ord) {
+        resolvedOrderId = ord._id;
+        resolvedRestaurantId = ord.restaurantId;
+      }
+    } else if (input.orderNumber?.trim()) {
+      const ord = await OrderModel.findOne({
+        orderNumber: { $regex: `^${input.orderNumber.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      })
+        .select('_id restaurantId')
+        .lean();
+      if (ord) {
+        resolvedOrderId = ord._id;
+        resolvedRestaurantId = ord.restaurantId;
+      }
+    }
+
+    if (!resolvedRestaurantId && input.restaurantId && mongoose.Types.ObjectId.isValid(input.restaurantId)) {
+      resolvedRestaurantId = new mongoose.Types.ObjectId(input.restaurantId);
+    }
+
+    const targetType: 'restaurant' | 'admin' =
+      senderRole === 'restaurant_owner'
+        ? 'admin'
+        : input.targetType === 'restaurant' && resolvedRestaurantId
+          ? 'restaurant'
+          : 'admin';
+
+    const now = new Date();
     const ticketNumber = `TKT-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     const ticket = await SupportTicketModel.create({
       ticketNumber,
       userId,
-      orderId: input.orderId && mongoose.Types.ObjectId.isValid(input.orderId) ? input.orderId : undefined,
+      orderId: resolvedOrderId,
+      restaurantId: resolvedRestaurantId,
+      targetType,
       category: input.category,
       subject: input.subject.trim(),
+      lastReadByCustomerAt: senderRole === 'customer' || senderRole === 'rider' ? now : undefined,
+      lastReadByRestaurantAt: senderRole === 'restaurant_owner' ? now : undefined,
     });
 
     await SupportMessageModel.create({
@@ -289,26 +465,55 @@ export class CustomerEngagementService {
     return { ...ticket.toObject(), id: String(ticket._id) };
   }
 
-  static async getSupportTicketDetail(ticketId: string, actorId: string, isAdmin: boolean) {
+  static async getSupportTicketDetail(ticketId: string, actorId: string, actorRoles: string[]) {
     if (!mongoose.Types.ObjectId.isValid(ticketId)) {
       throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
     }
     const ticket = await SupportTicketModel.findById(ticketId)
       .populate('userId', 'fullName email phone')
+      .populate('restaurantId', 'name ownerId')
       .lean();
     if (!ticket) {
       throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
     }
+
+    const isAdmin = actorRoles.includes('super_admin');
+    const isRestaurantRole = actorRoles.includes('restaurant_owner') || actorRoles.includes('restaurant_staff');
     const ownerObj = ticket.userId as unknown as { _id?: unknown; fullName?: string; email?: string; phone?: string } | null;
+    const restObj = ticket.restaurantId as unknown as { _id?: unknown; name?: string; ownerId?: unknown } | null;
     const ownerId = String(ownerObj?._id ?? ticket.userId);
-    if (!isAdmin && ownerId !== actorId) {
+    const isOwningRestaurant =
+      isRestaurantRole &&
+      (String(restObj?.ownerId ?? '') === actorId ||
+        (await this.canRestaurantAccessTicket(actorId, restObj?._id as mongoose.Types.ObjectId | undefined)));
+
+    if (!isAdmin && ownerId !== actorId && !isOwningRestaurant) {
       throw new AppError(403, 'FORBIDDEN', 'You do not have access to this support ticket');
     }
 
-    const messages = await SupportMessageModel.find({ ticketId: ticket._id })
-      .populate('senderId', 'fullName')
-      .sort({ createdAt: 1 })
-      .lean();
+    // Mark read timestamp for the current viewer
+    const now = new Date();
+    const readPatch: Record<string, Date> = {};
+    if (isAdmin) {
+      readPatch.lastReadByAdminAt = now;
+    } else if (isOwningRestaurant || (isRestaurantRole && ownerId === actorId)) {
+      readPatch.lastReadByRestaurantAt = now;
+    } else {
+      readPatch.lastReadByCustomerAt = now;
+    }
+    await SupportTicketModel.updateOne({ _id: ticket._id }, { $set: readPatch }).catch(() => {});
+
+    const [messages, orderMap] = await Promise.all([
+      SupportMessageModel.find({ ticketId: ticket._id })
+        .populate('senderId', 'fullName')
+        .sort({ createdAt: 1 })
+        .lean(),
+      ticket.orderId ? this.buildOrderSummaryMap([ticket.orderId]) : Promise.resolve(new Map()),
+    ]);
+
+    const adminReadTime = (readPatch.lastReadByAdminAt ?? ticket.lastReadByAdminAt)?.getTime() ?? 0;
+    const restReadTime = (readPatch.lastReadByRestaurantAt ?? ticket.lastReadByRestaurantAt)?.getTime() ?? 0;
+    const custReadTime = (readPatch.lastReadByCustomerAt ?? ticket.lastReadByCustomerAt)?.getTime() ?? 0;
 
     return {
       ticket: {
@@ -318,20 +523,50 @@ export class CustomerEngagementService {
         subject: ticket.subject,
         status: ticket.status,
         priority: ticket.priority,
+        targetType: ticket.targetType ?? 'admin',
+        restaurantId: restObj?._id ? String(restObj._id) : undefined,
+        restaurantName: restObj?.name ?? undefined,
+        escalatedToAdmin: Boolean(ticket.escalatedToAdmin),
+        escalatedAt: ticket.escalatedAt ? String(ticket.escalatedAt) : undefined,
+        rating: ticket.rating ?? undefined,
+        ratingFeedback: ticket.ratingFeedback ?? undefined,
         userName: ownerObj?.fullName ?? 'User',
         userEmail: ownerObj?.email ?? '',
         userPhone: ownerObj?.phone ?? '',
+        orderSummary: ticket.orderId ? orderMap.get(String(ticket.orderId)) : undefined,
         createdAt: String(ticket.createdAt),
         updatedAt: String(ticket.updatedAt),
       },
       messages: messages.map((m) => {
         const sender = m.senderId as unknown as { _id?: unknown; fullName?: string } | null;
+        const msgTime = new Date(m.createdAt).getTime();
+        let isSeen = false;
+        if (m.senderRole === 'customer' || m.senderRole === 'rider') {
+          isSeen =
+            ticket.targetType === 'restaurant'
+              ? restReadTime >= msgTime || adminReadTime >= msgTime
+              : adminReadTime >= msgTime;
+        } else if (m.senderRole === 'restaurant_owner') {
+          isSeen =
+            ticket.targetType === 'restaurant'
+              ? custReadTime >= msgTime
+              : adminReadTime >= msgTime;
+        } else if (m.senderRole === 'super_admin') {
+          isSeen = custReadTime >= msgTime || restReadTime >= msgTime;
+        }
         return {
           id: String(m._id),
           senderId: String(sender?._id ?? m.senderId),
-          senderName: sender?.fullName ?? (m.senderRole === 'super_admin' ? 'Dastarkhwan Support' : 'User'),
+          senderName:
+            sender?.fullName ??
+            (m.senderRole === 'super_admin'
+              ? 'Dastarkhwan Support'
+              : m.senderRole === 'restaurant_owner'
+                ? restObj?.name ?? 'Restaurant Partner'
+                : 'Customer'),
           senderRole: m.senderRole,
           message: m.message,
+          isSeen,
           createdAt: String(m.createdAt),
         };
       }),
@@ -356,7 +591,11 @@ export class CustomerEngagementService {
       throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
     }
     const isAdmin = senderRole === 'super_admin';
-    if (!isAdmin && String(ticket.userId) !== actorId) {
+    const isOwningRestaurant =
+      senderRole === 'restaurant_owner' &&
+      (await this.canRestaurantAccessTicket(actorId, ticket.restaurantId));
+
+    if (!isAdmin && String(ticket.userId) !== actorId && !isOwningRestaurant) {
       throw new AppError(403, 'FORBIDDEN', 'You do not have access to this support ticket');
     }
 
@@ -367,20 +606,37 @@ export class CustomerEngagementService {
       message: trimmed,
     });
 
-    if (isAdmin && ticket.status === 'open') {
-      ticket.status = 'in_progress';
-      ticket.assignedAdminId = new mongoose.Types.ObjectId(actorId);
-    } else if (!isAdmin && (ticket.status === 'resolved' || ticket.status === 'closed')) {
-      ticket.status = 'open';
+    const now = new Date();
+    if (isAdmin) {
+      ticket.lastReadByAdminAt = now;
+      if (ticket.status === 'open') {
+        ticket.status = 'in_progress';
+        ticket.assignedAdminId = new mongoose.Types.ObjectId(actorId);
+      }
+    } else if (isOwningRestaurant) {
+      ticket.lastReadByRestaurantAt = now;
+      if (ticket.status === 'open') {
+        ticket.status = 'in_progress';
+      }
+    } else {
+      if (senderRole === 'restaurant_owner') {
+        ticket.lastReadByRestaurantAt = now;
+      } else {
+        ticket.lastReadByCustomerAt = now;
+      }
+      if (ticket.status === 'resolved' || ticket.status === 'closed') {
+        ticket.status = 'open';
+      }
     }
-    ticket.updatedAt = new Date();
+    ticket.updatedAt = now;
     await ticket.save();
 
-    if (isAdmin) {
+    if ((isAdmin || isOwningRestaurant) && String(ticket.userId) !== actorId) {
+      const senderLabel = isAdmin ? 'Dastarkhwan Support' : 'Restaurant Support';
       await NotificationModel.create({
         userId: ticket.userId,
         type: 'support_reply',
-        title: `Support Reply (${ticket.ticketNumber})`,
+        title: `${senderLabel} Reply (${ticket.ticketNumber})`,
         body: trimmed.slice(0, 120),
         data: { ticketId: String(ticket._id) },
       }).catch(() => {});
@@ -391,43 +647,150 @@ export class CustomerEngagementService {
       senderId: actorId,
       senderRole,
       message: msg.message,
+      isSeen: false,
       createdAt: String(msg.createdAt),
     };
+  }
+
+  static async escalateSupportTicket(ticketId: string, actorId: string) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    const ticket = await SupportTicketModel.findById(ticketId);
+    if (!ticket) {
+      throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+    }
+    if (String(ticket.userId) !== actorId) {
+      throw new AppError(403, 'FORBIDDEN', 'Only the ticket creator can escalate this chat');
+    }
+    if (!ticket.escalatedToAdmin) {
+      ticket.escalatedToAdmin = true;
+      ticket.escalatedAt = new Date();
+      ticket.priority = 'high';
+      if (ticket.status === 'resolved' || ticket.status === 'closed') {
+        ticket.status = 'open';
+      }
+      ticket.updatedAt = new Date();
+      await ticket.save();
+
+      await SupportMessageModel.create({
+        ticketId: ticket._id,
+        senderId: actorId,
+        senderRole: 'system',
+        message: 'Escalated to Dastarkhwan Super Admin for priority assistance.',
+      });
+    }
+    return { id: String(ticket._id), escalatedToAdmin: true, priority: ticket.priority };
+  }
+
+  static async rateSupportTicket(
+    ticketId: string,
+    actorId: string,
+    rating: number,
+    feedback?: string
+  ) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new AppError(400, 'INVALID_RATING', 'Rating must be between 1 and 5');
+    }
+    const ticket = await SupportTicketModel.findById(ticketId);
+    if (!ticket) {
+      throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+    }
+    if (String(ticket.userId) !== actorId) {
+      throw new AppError(403, 'FORBIDDEN', 'Only the ticket creator can rate this support session');
+    }
+    ticket.rating = rating;
+    if (feedback?.trim()) {
+      ticket.ratingFeedback = feedback.trim().slice(0, 500);
+    }
+    await ticket.save();
+    return { id: String(ticket._id), rating: ticket.rating, ratingFeedback: ticket.ratingFeedback };
+  }
+
+  static async updateSupportTicketStatusByActor(
+    ticketId: string,
+    actorId: string,
+    actorRoles: string[],
+    status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  ) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    const ticket = await SupportTicketModel.findById(ticketId);
+    if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+    const isAdmin = actorRoles.includes('super_admin');
+    const isOwningRestaurant =
+      (actorRoles.includes('restaurant_owner') || actorRoles.includes('restaurant_staff')) &&
+      (await this.canRestaurantAccessTicket(actorId, ticket.restaurantId));
+    if (!isAdmin && !isOwningRestaurant) {
+      throw new AppError(403, 'FORBIDDEN', 'Only Support Admin or Restaurant Partner can update status');
+    }
+    ticket.status = status;
+    ticket.updatedAt = new Date();
+    await ticket.save();
+    return { ...ticket.toObject(), id: String(ticket._id) };
   }
 
   static async listAllSupportTicketsForAdmin() {
     const tickets = await SupportTicketModel.find()
       .populate('userId', 'fullName email phone')
-      .sort({ updatedAt: -1, createdAt: -1 })
+      .populate('restaurantId', 'name')
+      .sort({ escalatedToAdmin: -1, updatedAt: -1, createdAt: -1 })
       .limit(150)
       .lean();
     const ticketIds = tickets.map((t) => t._id);
-    const messages = await SupportMessageModel.find({ ticketId: { $in: ticketIds } })
-      .sort({ createdAt: -1 })
-      .lean();
+    const orderIds = tickets
+      .map((t) => t.orderId)
+      .filter((id): id is mongoose.Types.ObjectId => Boolean(id));
+    const [messages, orderMap] = await Promise.all([
+      SupportMessageModel.find({ ticketId: { $in: ticketIds } }).sort({ createdAt: -1 }).lean(),
+      this.buildOrderSummaryMap(orderIds),
+    ]);
     const lastByTicket = new Map<string, { message: string; senderRole: string; createdAt: Date }>();
     const countByTicket = new Map<string, number>();
+    const msgsByTicket = new Map<string, Array<{ senderRole: string; createdAt: Date }>>();
     for (const m of messages) {
       const k = String(m.ticketId);
       countByTicket.set(k, (countByTicket.get(k) ?? 0) + 1);
+      const arr = msgsByTicket.get(k) ?? [];
+      arr.push({ senderRole: m.senderRole, createdAt: m.createdAt });
+      msgsByTicket.set(k, arr);
       if (!lastByTicket.has(k)) {
         lastByTicket.set(k, { message: m.message, senderRole: m.senderRole, createdAt: m.createdAt });
       }
     }
     return tickets.map((t) => {
+      const idStr = String(t._id);
       const u = t.userId as unknown as { fullName?: string; email?: string; phone?: string } | null;
-      const last = lastByTicket.get(String(t._id));
+      const rest = t.restaurantId as unknown as { _id?: unknown; name?: string } | null;
+      const last = lastByTicket.get(idStr);
+      const unreadCount = (msgsByTicket.get(idStr) ?? []).filter((m) => {
+        if (m.senderRole === 'super_admin') return false;
+        if (!t.lastReadByAdminAt) return true;
+        return new Date(m.createdAt).getTime() > new Date(t.lastReadByAdminAt).getTime();
+      }).length;
       return {
-        id: String(t._id),
+        id: idStr,
         ticketNumber: t.ticketNumber,
         userName: u?.fullName ?? 'User',
         userEmail: u?.email ?? '',
         userPhone: u?.phone ?? '',
+        targetType: t.targetType ?? 'admin',
+        restaurantId: rest?._id ? String(rest._id) : undefined,
+        restaurantName: rest?.name ?? undefined,
+        escalatedToAdmin: Boolean(t.escalatedToAdmin),
+        rating: t.rating ?? undefined,
+        ratingFeedback: t.ratingFeedback ?? undefined,
+        orderSummary: t.orderId ? orderMap.get(String(t.orderId)) : undefined,
         category: t.category,
         subject: t.subject,
         status: t.status,
         priority: t.priority,
-        messageCount: countByTicket.get(String(t._id)) ?? 0,
+        messageCount: countByTicket.get(idStr) ?? 0,
+        unreadCount,
         lastMessage: last?.message ?? '',
         lastSenderRole: last?.senderRole ?? '',
         createdAt: String(t.createdAt),

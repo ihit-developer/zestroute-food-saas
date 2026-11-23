@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Edit3, Headphones, Plus, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, CheckCheck, Download, Edit3, Headphones, Plus, Send, ShoppingBag, Star, Store, Trash2, Zap } from 'lucide-react';
 import {
   DataTable,
   Dropdown,
@@ -20,17 +20,34 @@ import { useAdminStore } from '../store/useAdminStore';
 
 interface LogRow { id: string; actor: string; action: string; resource: string; timestamp: string }
 
+interface AdminOrderSummary {
+  id: string;
+  orderNumber: string;
+  restaurantName: string;
+  status: string;
+  totalMinor: number;
+  paymentMethod: string;
+  itemsSummary: string;
+}
+
 interface AdminSupportTicket {
   id: string;
   ticketNumber: string;
   userName: string;
   userEmail: string;
   userPhone: string;
+  targetType?: 'restaurant' | 'admin';
+  restaurantName?: string;
+  escalatedToAdmin?: boolean;
+  rating?: number;
+  ratingFeedback?: string;
+  orderSummary?: AdminOrderSummary;
   category: string;
   subject: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   priority?: 'low' | 'medium' | 'high';
   messageCount: number;
+  unreadCount?: number;
   lastMessage: string;
   lastSenderRole: string;
   updatedAt: string;
@@ -44,14 +61,22 @@ interface AdminSupportDetail {
     senderName: string;
     senderRole: string;
     message: string;
+    isSeen?: boolean;
     createdAt: string;
   }>;
 }
 
+const ADMIN_QUICK_REPLIES = [
+  'Hello! Dastarkhwan Support here — reviewing your issue right now.',
+  'We have coordinated with the restaurant & rider for fastest resolution.',
+  'Your refund request is under review and will reflect shortly.',
+  'Glad we could help! Please rate your support experience.',
+];
+
 export const ComplaintsPage: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  const [filter, setFilter] = useState<'all' | 'escalated' | 'open' | 'in_progress' | 'resolved'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
@@ -78,7 +103,11 @@ export const ComplaintsPage: React.FC = () => {
     queryFn: () => adminHttpClient.get<AdminSupportTicket[]>('/admin/support/tickets'),
   });
 
-  const filtered = tickets.filter((t) => (filter === 'all' ? true : t.status === filter));
+  const filtered = tickets.filter((t) => {
+    if (filter === 'all') return true;
+    if (filter === 'escalated') return Boolean(t.escalatedToAdmin);
+    return t.status === filter;
+  });
   const activeId = selectedId ?? filtered[0]?.id ?? null;
 
   const { data: detail, refetch: refetchDetail } = useQuery<AdminSupportDetail>({
@@ -92,13 +121,13 @@ export const ComplaintsPage: React.FC = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [detail?.messages?.length]);
 
-  const handleSendReply = async () => {
-    const text = reply.trim();
+  const handleSendReply = async (overrideText?: string) => {
+    const text = (overrideText ?? reply).trim();
     if (!text || !activeId || sending) return;
     setSending(true);
     try {
       await adminHttpClient.post(`/admin/support/tickets/${activeId}/messages`, { message: text });
-      setReply('');
+      if (!overrideText) setReply('');
       await Promise.all([
         refetchDetail(),
         queryClient.invalidateQueries({ queryKey: ['admin', 'support-tickets'] }),
@@ -221,12 +250,13 @@ export const ComplaintsPage: React.FC = () => {
           <Tabs
             items={[
               { key: 'all', label: `All (${tickets.length})` },
+              { key: 'escalated', label: `Escalated (${tickets.filter((t) => t.escalatedToAdmin).length})` },
               { key: 'open', label: `Open (${tickets.filter((t) => t.status === 'open').length})` },
               { key: 'in_progress', label: `In Progress (${tickets.filter((t) => t.status === 'in_progress').length})` },
               { key: 'resolved', label: `Resolved (${tickets.filter((t) => t.status === 'resolved').length})` },
             ]}
             activeKey={filter}
-            onChange={(k) => setFilter(k as 'all' | 'open' | 'in_progress' | 'resolved')}
+            onChange={(k) => setFilter(k as 'all' | 'escalated' | 'open' | 'in_progress' | 'resolved')}
           />
           <PrimaryButton leftIcon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
             New Ticket
@@ -267,10 +297,51 @@ export const ComplaintsPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <strong style={{ fontSize: 13 }}>{t.ticketNumber}</strong>
-                    <StatusBadge
-                      label={t.status.replace('_', ' ').toUpperCase()}
-                      tone={t.status === 'resolved' ? 'success' : t.status === 'in_progress' ? 'info' : 'warning'}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {(t.unreadCount ?? 0) > 0 ? (
+                        <span
+                          style={{
+                            minWidth: 19,
+                            height: 19,
+                            borderRadius: 999,
+                            background: '#EF4444',
+                            color: '#FFFFFF',
+                            fontSize: 11,
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 5px',
+                          }}
+                        >
+                          {t.unreadCount}
+                        </span>
+                      ) : null}
+                      <StatusBadge
+                        label={t.status.replace('_', ' ').toUpperCase()}
+                        tone={t.status === 'resolved' ? 'success' : t.status === 'in_progress' ? 'info' : 'warning'}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    {t.targetType === 'restaurant' ? (
+                      <span style={{ fontSize: 10.5, fontWeight: 800, color: '#EA580C', background: 'rgba(244,123,32,0.12)', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <Store size={10} />
+                        {t.restaurantName || 'Restaurant'}
+                      </span>
+                    ) : null}
+                    {t.escalatedToAdmin ? (
+                      <span style={{ fontSize: 10.5, fontWeight: 800, color: '#DC2626', background: 'rgba(220,38,38,0.12)', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <AlertTriangle size={10} />
+                        ESCALATED
+                      </span>
+                    ) : null}
+                    {t.rating ? (
+                      <span style={{ fontSize: 10.5, fontWeight: 800, color: '#B45309', background: 'rgba(245,158,11,0.14)', padding: '2px 7px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <Star size={10} fill="#F59E0B" color="#F59E0B" />
+                        {t.rating}/5
+                      </span>
+                    ) : null}
                   </div>
                   <div style={{ fontSize: 13.5, fontWeight: 800 }}>{t.subject}</div>
                   <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
@@ -326,8 +397,60 @@ export const ComplaintsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ flex: 1, maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+                {/* Attached Live Order Card */}
+                {detail.ticket.orderSummary ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      background: 'rgba(244,123,32,0.08)',
+                      border: '1px solid rgba(244,123,32,0.28)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <ShoppingBag size={18} color="#F47B20" />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800 }}>
+                          Order {detail.ticket.orderSummary.orderNumber} · {detail.ticket.orderSummary.restaurantName} · {formatMoney(detail.ticket.orderSummary.totalMinor)}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
+                          {detail.ticket.orderSummary.itemsSummary}
+                        </div>
+                      </div>
+                    </div>
+                    <StatusBadge
+                      label={detail.ticket.orderSummary.status.replace('_', ' ').toUpperCase()}
+                      tone="info"
+                    />
+                  </div>
+                ) : null}
+
+                <div style={{ flex: 1, maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
                   {detail.messages.map((m) => {
+                    if (m.senderRole === 'system') {
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            alignSelf: 'center',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#92400E',
+                            background: '#FEF3C7',
+                            border: '1px solid #FCD34D',
+                            padding: '5px 12px',
+                            borderRadius: 999,
+                          }}
+                        >
+                          {m.message}
+                        </div>
+                      );
+                    }
                     const isAdmin = m.senderRole === 'super_admin';
                     return (
                       <div
@@ -360,6 +483,13 @@ export const ComplaintsPage: React.FC = () => {
                           <span style={{ fontSize: 10.5, color: 'var(--zr-text-secondary)' }}>
                             {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {isAdmin ? (
+                            m.isSeen ? (
+                              <CheckCheck size={13} color="#0284C7" />
+                            ) : (
+                              <Check size={13} color="var(--zr-text-secondary)" />
+                            )
+                          ) : null}
                           <button
                             type="button"
                             title="Delete message"
@@ -380,6 +510,55 @@ export const ComplaintsPage: React.FC = () => {
                     );
                   })}
                   <div ref={chatEndRef} />
+                </div>
+
+                {detail.ticket.rating ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      background: 'rgba(245,158,11,0.1)',
+                      border: '1px solid rgba(245,158,11,0.3)',
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <Star size={15} color="#F59E0B" fill="#F59E0B" />
+                    <strong>User Support Rating: {detail.ticket.rating}/5</strong>
+                    {detail.ticket.ratingFeedback ? (
+                      <span style={{ color: 'var(--zr-text-secondary)' }}>— &ldquo;{detail.ticket.ratingFeedback}&rdquo;</span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* 1-Tap Quick Replies */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--zr-text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Zap size={12} color="#F47B20" />
+                    Quick Reply:
+                  </span>
+                  {ADMIN_QUICK_REPLIES.map((qr) => (
+                    <button
+                      key={qr}
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void handleSendReply(qr)}
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: '5px 10px',
+                        borderRadius: 999,
+                        border: '1px solid var(--zr-border)',
+                        background: 'var(--zr-surface-alt)',
+                        color: 'var(--zr-text-primary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {qr}
+                    </button>
+                  ))}
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', borderTop: '1px solid var(--zr-border)', paddingTop: 12 }}>

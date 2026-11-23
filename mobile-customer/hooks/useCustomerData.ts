@@ -42,12 +42,33 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+export interface SupportOrderSummary {
+  id: string;
+  orderNumber: string;
+  restaurantId: string;
+  restaurantName: string;
+  status: string;
+  totalMinor: number;
+  paymentMethod: string;
+  itemsSummary: string;
+  createdAt: string;
+}
+
 export interface SupportTicketItem {
   id: string;
   ticketNumber: string;
   subject: string;
   category: string;
-  status: 'open' | 'in_progress' | 'resolved';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  targetType?: 'restaurant' | 'admin';
+  restaurantId?: string;
+  restaurantName?: string;
+  escalatedToAdmin?: boolean;
+  rating?: number;
+  unreadCount?: number;
+  lastMessage?: string;
+  lastSenderRole?: string;
+  orderSummary?: SupportOrderSummary;
   updatedAt: string;
 }
 
@@ -143,6 +164,7 @@ export function useSupportTickets() {
   const query = useQuery<SupportTicketItem[]>({
     queryKey: ['customer', 'support-tickets'],
     enabled: isAuth,
+    refetchInterval: 4000,
     queryFn: () => httpClient.get<SupportTicketItem[]>('/support/tickets'),
   });
   return { ...query, data: query.data ?? [] };

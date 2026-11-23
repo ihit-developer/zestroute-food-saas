@@ -28,6 +28,7 @@ import { useRestaurantStore } from '../store/useRestaurantStore';
 import { restaurantAuthApi, restaurantHttpClient, restaurantTokenStorage } from '../services/apiClient';
 import type { VendorSubscriptionOverview } from '../pages/dashboard/SubscriptionPage';
 import { LiveOrderAlertPopup } from '../components/LiveOrderAlertPopup';
+import { LiveSupportAlertPopup } from '../components/LiveSupportAlertPopup';
 
 export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = ({
   title = 'Portal',
@@ -75,6 +76,17 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
       .catch(() => {});
   }, [hasToken, queryClient, restaurantId, restaurantName, setRestaurantContext]);
 
+  const { data: supportList = [] } = useQuery<Array<{ unreadCount?: number }>>({
+    queryKey: ['restaurant', restaurantId, 'support-tickets'],
+    enabled: Boolean(restaurantId && restaurantTokenStorage.getAccessToken()),
+    refetchInterval: 4000,
+    queryFn: () =>
+      restaurantHttpClient.get<Array<{ unreadCount?: number }>>(
+        `/support/tickets?restaurantId=${encodeURIComponent(restaurantId ?? '')}`
+      ),
+  });
+  const supportUnread = supportList.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
+
   const navItems: NavItem[] = [
     { key: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { key: '/orders', label: 'Orders', icon: <ShoppingBag size={18} /> },
@@ -87,7 +99,12 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
     { key: '/reviews', label: 'Reviews', icon: <MessageSquare size={18} /> },
     { key: '/finance', label: 'Finance', icon: <DollarSign size={18} /> },
     { key: '/subscription', label: 'Subscription', icon: <CreditCard size={18} /> },
-    { key: '/support', label: 'Live Support', icon: <Headphones size={18} /> },
+    {
+      key: '/support',
+      label: 'Live Support',
+      icon: <Headphones size={18} />,
+      badge: supportUnread > 0 ? supportUnread : undefined,
+    },
     { key: '/profile', label: 'Profile', icon: <Store size={18} /> },
     { key: '/settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
@@ -135,6 +152,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
 
       <div className="zr-main">
         <LiveOrderAlertPopup />
+        <LiveSupportAlertPopup />
         {/* Big Prominent Active Restaurant Brand Banner */}
         <div className="zr-kitchen-banner">
           <div className="zr-kitchen-left">
