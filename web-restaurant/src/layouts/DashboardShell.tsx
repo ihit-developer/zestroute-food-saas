@@ -136,47 +136,23 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
       <div className="zr-main">
         <LiveOrderAlertPopup />
         {/* Big Prominent Active Restaurant Brand Banner */}
-        <div
-          style={{
-            padding: '14px 24px',
-            background: 'linear-gradient(135deg, #F47B20, #D95F16)',
-            color: '#FFFFFF',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                background: 'rgba(255,255,255,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Store size={22} color="#FFFFFF" />
+        <div className="zr-kitchen-banner">
+          <div className="zr-kitchen-left">
+            <div className="zr-kitchen-icon">
+              <Store size={19} color="#FFFFFF" />
             </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', opacity: 0.9, textTransform: 'uppercase' }}>
-                Active Restaurant Web Portal
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.15 }}>
-                {restaurantName || 'Pizza Box'}
-              </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="zr-kitchen-kicker">Active Restaurant Web Portal</div>
+              <div className="zr-kitchen-name">{restaurantName || 'Pizza Box'}</div>
             </div>
           </div>
 
           {myRestaurants.length > 1 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.92 }}>Switch Kitchen:</span>
+            <div className="zr-kitchen-switcher">
+              <span className="zr-kitchen-switch-label">Switch Kitchen:</span>
               <select
                 aria-label="Switch Restaurant"
+                className="zr-kitchen-select"
                 value={restaurantId ?? myRestaurants[0].id}
                 onChange={(e) => {
                   const picked = myRestaurants.find((r) => r.id === e.target.value);
@@ -184,16 +160,6 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
                     setRestaurantContext(picked.name, picked.status, picked.id);
                     void queryClient.invalidateQueries({ queryKey: ['restaurant'] });
                   }
-                }}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.4)',
-                  background: '#FFFFFF',
-                  color: '#1F1C19',
-                  fontWeight: 800,
-                  fontSize: 13.5,
-                  cursor: 'pointer',
                 }}
               >
                 {myRestaurants.map((r) => (
@@ -207,8 +173,8 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
         </div>
 
         <TopNav
-          title={`${restaurantName || 'Pizza Box'} — ${title}`}
-          subtitle={subtitle}
+          title={title}
+          subtitle={`${restaurantName || 'Pizza Box'}${subtitle ? ` · ${subtitle}` : ''}`}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
           actions={
             <>

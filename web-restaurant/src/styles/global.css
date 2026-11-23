@@ -338,6 +338,79 @@ button:not(:disabled):active {
   z-index: 20;
 }
 
+.zr-kitchen-banner {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #F47B20, #D95F16);
+  color: #FFFFFF;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.zr-kitchen-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.zr-kitchen-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.zr-kitchen-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.zr-kitchen-name {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zr-kitchen-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.zr-kitchen-switch-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+
+.zr-kitchen-select {
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: #FFFFFF;
+  color: #1F1C19;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 190px;
+}
+
 .zr-split-grid {
   display: grid;
   grid-template-columns: minmax(260px, 340px) 1fr;
@@ -411,6 +484,31 @@ button:not(:disabled):active {
 }
 
 @media (max-width: 767px) {
+  .zr-kitchen-banner {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .zr-kitchen-left {
+    gap: 8px;
+  }
+  .zr-kitchen-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+  .zr-kitchen-kicker,
+  .zr-kitchen-switch-label {
+    display: none;
+  }
+  .zr-kitchen-name {
+    font-size: 15.5px;
+  }
+  .zr-kitchen-select {
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    max-width: 140px;
+  }
   .zr-table th,
   .zr-table td {
     padding: 10px 12px;
