@@ -114,16 +114,116 @@ export class RestaurantService {
   }
 
   static async getDashboardMetrics(restaurantId: string) {
-    const startOfDay = new Date();
+    const now = new Date();
+    const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+    const startOfMonth = new Date(startOfDay);
+    startOfMonth.setDate(startOfMonth.getDate() - 29);
 
     const [orders, restaurant] = await Promise.all([
       OrderModel.find({ restaurantId }).lean(),
       RestaurantModel.findById(restaurantId).select('ratingAvg').lean(),
     ]);
 
-    const todayOrders = orders.filter((o) => new Date(o.createdAt) >= startOfDay);
+    const nonCancelled = orders.filter((o) => !['cancelled', 'rejected'].includes(o.status));
+    const todayOrders = nonCancelled.filter((o) => new Date(o.createdAt) >= startOfDay);
+    const weeklyOrders = nonCancelled.filter((o) => new Date(o.createdAt) >= startOfWeek);
+    const monthlyOrders = nonCancelled.filter((o) => new Date(o.createdAt) >= startOfMonth);
     const delivered = orders.filter((o) => o.status === 'delivered');
+
+    // Best Selling Food Item from live OrderItemModel
+    let bestSellingFood = 'No orders yet';
+    const validOrderIds = nonCancelled.map((o) => o._id);
+    if (validOrderIds.length > 0) {
+      const orderItems = await OrderItemModel.find({ orderId: { $in: validOrderIds } })
+        .select('nameSnapshot quantity')
+        .lean();
+      const qtyByName = new Map<string, number>();
+      for (const item of orderItems) {
+        const name = item.nameSnapshot || 'Food Item';
+        qtyByName.set(name, (qtyByName.get(name) ?? 0) + (item.quantity ?? 1));
+      }
+      let topName = '';
+      let topQty = 0;
+      for (const [name, qty] of qtyByName.entries()) {
+        if (qty > topQty) {
+          topName = name;
+          topQty = qty;
+        }
+      }
+      if (topName) {
+        bestSellingFood = `${topName} (${topQty} sold)`;
+      }
+    }
+
+    // Daily Sales & Orders (Last 7 Days)
+    const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+    const dailyMap = new Map<string, { day: string; salesMinor: number; orders: number }>();
+    const dailyKeys: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(startOfDay);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      dailyKeys.push(key);
+      dailyMap.set(key, {
+        day: i === 0 ? 'Today' : dayFormatter.format(d),
+        salesMinor: 0,
+        orders: 0,
+      });
+    }
+    for (const o of weeklyOrders) {
+      const d = new Date(o.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const bucket = dailyMap.get(key);
+      if (bucket) {
+        bucket.salesMinor += o.subtotalMinor ?? o.totalMinor ?? 0;
+        bucket.orders += 1;
+      }
+    }
+    const dailySalesSeries = dailyKeys.map((k) => {
+      const b = dailyMap.get(k)!;
+      return {
+        day: b.day,
+        sales: Math.round(b.salesMinor / 100),
+        orders: b.orders,
+      };
+    });
+
+    // Monthly Revenue Trend (Last 6 Months)
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+    const monthMap = new Map<string, { month: string; revenueMinor: number; orders: number }>();
+    const monthKeys: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthKeys.push(key);
+      monthMap.set(key, {
+        month: monthFormatter.format(d),
+        revenueMinor: 0,
+        orders: 0,
+      });
+    }
+    for (const o of nonCancelled) {
+      const d = new Date(o.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const bucket = monthMap.get(key);
+      if (bucket) {
+        bucket.revenueMinor += o.subtotalMinor ?? o.totalMinor ?? 0;
+        bucket.orders += 1;
+      }
+    }
+    const monthlyRevenueSeries = monthKeys.map((k) => {
+      const b = monthMap.get(k)!;
+      return {
+        month: b.month,
+        revenue: Math.round(b.revenueMinor / 100),
+        orders: b.orders,
+      };
+    });
 
     return {
       todayOrders: todayOrders.length,
@@ -132,15 +232,15 @@ export class RestaurantService {
       acceptedOrders: orders.filter((o) => ['confirmed', 'preparing', 'ready_for_pickup'].includes(o.status)).length,
       completedOrders: delivered.length,
       cancelledOrders: orders.filter((o) => ['cancelled', 'rejected'].includes(o.status)).length,
-      todaySalesMinor: todayOrders.reduce((s, o) => s + o.subtotalMinor, 0),
-      weeklySalesMinor: delivered.reduce((s, o) => s + o.subtotalMinor, 0),
-      monthlySalesMinor: delivered.reduce((s, o) => s + o.subtotalMinor, 0),
-      totalEarningsMinor: delivered.reduce((s, o) => s + o.restaurantNetMinor, 0),
-      platformCommissionMinor: delivered.reduce((s, o) => s + o.commissionMinor, 0),
+      todaySalesMinor: todayOrders.reduce((s, o) => s + (o.subtotalMinor ?? 0), 0),
+      weeklySalesMinor: weeklyOrders.reduce((s, o) => s + (o.subtotalMinor ?? 0), 0),
+      monthlySalesMinor: monthlyOrders.reduce((s, o) => s + (o.subtotalMinor ?? 0), 0),
+      totalEarningsMinor: delivered.reduce((s, o) => s + (o.restaurantNetMinor ?? 0), 0),
+      platformCommissionMinor: delivered.reduce((s, o) => s + (o.commissionMinor ?? 0), 0),
       averageRating: restaurant?.ratingAvg ?? 0,
-      bestSellingFood: '—',
-      dailySalesSeries: [],
-      monthlyRevenueSeries: [],
+      bestSellingFood,
+      dailySalesSeries,
+      monthlyRevenueSeries,
     };
   }
 
