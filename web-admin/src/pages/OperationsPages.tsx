@@ -84,7 +84,7 @@ export const GlobalOrdersPage: React.FC = () => {
             Real-time orders across Pizza Box, Cheezious, and all partner kitchens
           </span>
         </div>
-        <div style={{ width: 320 }}>
+        <div className="zr-search-slot">
           <SearchBar value={search} onChange={setSearch} placeholder="Search Order #, Restaurant, Customer..." />
         </div>
       </div>

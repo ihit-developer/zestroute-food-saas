@@ -121,7 +121,7 @@ export const CustomersPage: React.FC = () => {
             Manage registered customer accounts and platform access
           </span>
         </div>
-        <div style={{ width: 320 }}>
+        <div className="zr-search-slot">
           <SearchBar value={search} onChange={setSearch} placeholder="Search by name, email, phone..." />
         </div>
       </div>
@@ -274,7 +274,7 @@ export const RestaurantsPage: React.FC = () => {
             Live SaaS kitchens active on the Dastarkhwan marketplace
           </span>
         </div>
-        <div style={{ width: 320 }}>
+        <div className="zr-search-slot">
           <SearchBar value={search} onChange={setSearch} placeholder="Search restaurants or cuisines..." />
         </div>
       </div>

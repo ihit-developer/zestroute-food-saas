@@ -139,7 +139,7 @@ export const TopNav: React.FC<{
       <div style={{ minWidth: 0 }}>
         <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h1>
         {subtitle && (
-          <span style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>{subtitle}</span>
+          <span className="zr-hide-mobile" style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>{subtitle}</span>
         )}
       </div>
     </div>

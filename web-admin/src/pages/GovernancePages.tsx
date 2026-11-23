@@ -242,7 +242,7 @@ export const ComplaintsPage: React.FC = () => {
           />
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="zr-split-grid">
           {/* Left Ticket Inbox */}
           <div className="zr-card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 620, overflowY: 'auto' }}>
             {filtered.map((t) => {

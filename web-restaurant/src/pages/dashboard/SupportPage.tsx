@@ -140,7 +140,7 @@ export const SupportPage: React.FC = () => {
           />
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="zr-split-grid">
           <div className="zr-card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 580, overflowY: 'auto' }}>
             {tickets.map((t) => {
               const selected = t.id === activeId;

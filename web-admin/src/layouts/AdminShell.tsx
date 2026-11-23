@@ -122,6 +122,7 @@ export const AdminShell: React.FC = () => {
               />
             </div>
             <div
+              className="zr-hide-mobile"
               style={{
                 width: 38,
                 height: 38,
@@ -132,21 +133,22 @@ export const AdminShell: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(244, 123, 32, 0.28)',
+                flexShrink: 0,
               }}
             >
               <ShieldCheck size={20} />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {activeItem.label}
                 </h1>
-                <span className="zr-live-pill">
+                <span className="zr-live-pill zr-hide-mobile">
                   <span className="zr-live-dot" />
                   LIVE DATA
                 </span>
               </div>
-              <span style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
+              <span className="zr-hide-mobile" style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>
                 Dastarkhwan Super Admin · Multi-Restaurant SaaS Control Center
               </span>
             </div>
