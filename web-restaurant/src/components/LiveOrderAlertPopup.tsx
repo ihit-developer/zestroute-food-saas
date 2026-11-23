@@ -42,6 +42,8 @@ function playOrderChime() {
   }
 }
 
+const AUTO_DISMISS_MS = 7000;
+
 export const LiveOrderAlertPopup: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -49,6 +51,7 @@ export const LiveOrderAlertPopup: React.FC = () => {
   const restaurantId = useRestaurantStore((s) => s.restaurantId);
   const initializedRef = useRef(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [alerts, setAlerts] = useState<IncomingOrder[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
@@ -59,11 +62,33 @@ export const LiveOrderAlertPopup: React.FC = () => {
     queryFn: () => restaurantHttpClient.get<IncomingOrder[]>(`/restaurant/${restaurantId}/orders?status=pending`),
   });
 
+  const clearTimer = (id: string) => {
+    const existing = timersRef.current.get(id);
+    if (existing) {
+      clearTimeout(existing);
+      timersRef.current.delete(id);
+    }
+  };
+
+  const dismiss = (id: string) => {
+    clearTimer(id);
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
   useEffect(() => {
     initializedRef.current = false;
     seenIdsRef.current = new Set();
+    timersRef.current.forEach((t) => clearTimeout(t));
+    timersRef.current.clear();
     setAlerts([]);
   }, [restaurantId]);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!initializedRef.current) {
@@ -74,13 +99,18 @@ export const LiveOrderAlertPopup: React.FC = () => {
 
     const brandNew = pendingOrders.filter((o) => !seenIdsRef.current.has(o.id));
     if (brandNew.length > 0) {
-      brandNew.forEach((o) => seenIdsRef.current.add(o.id));
+      brandNew.forEach((o) => {
+        seenIdsRef.current.add(o.id);
+        clearTimer(o.id);
+        const timer = setTimeout(() => {
+          dismiss(o.id);
+        }, AUTO_DISMISS_MS);
+        timersRef.current.set(o.id, timer);
+      });
       playOrderChime();
       setAlerts((prev) => [...brandNew, ...prev].slice(0, 3));
     }
   }, [pendingOrders]);
-
-  const dismiss = (id: string) => setAlerts((prev) => prev.filter((a) => a.id !== id));
 
   const handleQuickAccept = async (ord: IncomingOrder) => {
     if (!restaurantId) return;
@@ -224,6 +254,9 @@ export const LiveOrderAlertPopup: React.FC = () => {
               <ShoppingBag size={14} />
               <span>View</span>
             </button>
+          </div>
+          <div className="zr-popup-timer-track">
+            <div className="zr-popup-timer-bar" />
           </div>
         </div>
       ))}

@@ -37,10 +37,13 @@ function playAdminChime() {
   }
 }
 
+const AUTO_DISMISS_MS = 7000;
+
 export const AdminLiveOrderPopup: React.FC = () => {
   const navigate = useNavigate();
   const initializedRef = useRef(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [alerts, setAlerts] = useState<AdminOrderAlert[]>([]);
 
   const { data: orders = [] } = useQuery<AdminOrderAlert[]>({
@@ -50,6 +53,26 @@ export const AdminLiveOrderPopup: React.FC = () => {
     queryFn: () => adminHttpClient.get<AdminOrderAlert[]>('/admin/orders'),
   });
 
+  const clearTimer = (id: string) => {
+    const existing = timersRef.current.get(id);
+    if (existing) {
+      clearTimeout(existing);
+      timersRef.current.delete(id);
+    }
+  };
+
+  const dismiss = (id: string) => {
+    clearTimer(id);
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current.clear();
+    };
+  }, []);
+
   useEffect(() => {
     if (!initializedRef.current) {
       orders.forEach((o) => seenIdsRef.current.add(o.id));
@@ -58,13 +81,18 @@ export const AdminLiveOrderPopup: React.FC = () => {
     }
     const fresh = orders.filter((o) => !seenIdsRef.current.has(o.id));
     if (fresh.length > 0) {
-      fresh.forEach((o) => seenIdsRef.current.add(o.id));
+      fresh.forEach((o) => {
+        seenIdsRef.current.add(o.id);
+        clearTimer(o.id);
+        const timer = setTimeout(() => {
+          dismiss(o.id);
+        }, AUTO_DISMISS_MS);
+        timersRef.current.set(o.id, timer);
+      });
       playAdminChime();
       setAlerts((prev) => [...fresh, ...prev].slice(0, 3));
     }
   }, [orders]);
-
-  const dismiss = (id: string) => setAlerts((prev) => prev.filter((a) => a.id !== id));
 
   if (alerts.length === 0) return null;
 
@@ -171,6 +199,9 @@ export const AdminLiveOrderPopup: React.FC = () => {
             <ShoppingBag size={14} />
             <span>Open Global Orders</span>
           </button>
+          <div className="zr-popup-timer-track">
+            <div className="zr-popup-timer-bar" />
+          </div>
         </div>
       ))}
     </div>
