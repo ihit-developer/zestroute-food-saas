@@ -524,14 +524,7 @@ button:not(:disabled):active {
     height: 36px;
   }
   .zr-mobile-bottom-nav {
-    display: flex;
-    position: sticky;
-    bottom: 0;
-    z-index: 30;
-    background: var(--zr-surface);
-    border-top: 1px solid var(--zr-border);
-    padding: 6px 4px;
-    justify-content: space-around;
+    display: none !important;
   }
 }
 

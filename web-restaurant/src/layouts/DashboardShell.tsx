@@ -23,7 +23,7 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { BottomNav, IconButton, SecondaryButton, Sidebar, TopNav, type NavItem } from '../components/ui';
+import { IconButton, SecondaryButton, Sidebar, TopNav, type NavItem } from '../components/ui';
 import { useRestaurantStore } from '../store/useRestaurantStore';
 import { restaurantAuthApi, restaurantHttpClient, restaurantTokenStorage } from '../services/apiClient';
 import type { VendorSubscriptionOverview } from '../pages/dashboard/SubscriptionPage';
@@ -259,8 +259,6 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
           ) : null}
           <Outlet />
         </main>
-
-        <BottomNav items={navItems} activeKey={activeKey} onSelect={(key) => navigate(key)} />
       </div>
     </div>
   );
