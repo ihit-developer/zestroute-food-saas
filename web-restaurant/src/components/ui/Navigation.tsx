@@ -124,26 +124,26 @@ export const TopNav: React.FC<{
   onOpenMobileMenu?: () => void;
 }> = ({ title, subtitle, actions, onOpenMobileMenu }) => (
   <header className="zr-topbar">
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, overflow: 'hidden' }}>
       {onOpenMobileMenu && (
         <button
           type="button"
           onClick={onOpenMobileMenu}
           aria-label="Open navigation menu"
           className="zr-icon-btn zr-mobile-only"
-          style={{ width: 38, height: 38, flexShrink: 0 }}
+          style={{ width: 36, height: 36, flexShrink: 0 }}
         >
-          <Menu size={19} />
+          <Menu size={18} />
         </button>
       )}
-      <div style={{ minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h1>
         {subtitle && (
           <span className="zr-hide-mobile" style={{ fontSize: 12, color: 'var(--zr-text-secondary)' }}>{subtitle}</span>
         )}
       </div>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{actions}</div>
   </header>
 );
 

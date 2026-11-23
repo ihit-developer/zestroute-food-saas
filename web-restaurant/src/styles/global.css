@@ -381,7 +381,8 @@ button:not(:disabled):active {
     z-index: 90;
   }
   .zr-topbar {
-    padding: 10px 14px;
+    padding: 8px 12px;
+    min-height: 58px;
   }
   .zr-main main {
     padding: 14px 12px !important;
@@ -391,10 +392,25 @@ button:not(:disabled):active {
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 900px) {
   .zr-hide-mobile {
     display: none !important;
   }
+  .zr-topbar .zr-btn {
+    min-height: 34px;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .zr-topbar .zr-icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .zr-topbar h1 {
+    font-size: 15px !important;
+  }
+}
+
+@media (max-width: 767px) {
   .zr-table th,
   .zr-table td {
     padding: 10px 12px;

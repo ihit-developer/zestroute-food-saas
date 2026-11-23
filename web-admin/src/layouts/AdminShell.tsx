@@ -113,8 +113,8 @@ export const AdminShell: React.FC = () => {
       <div className="zr-main">
         <AdminLiveOrderPopup />
         <header className="zr-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <div className="zr-mobile-only">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <div className="zr-mobile-only" style={{ flexShrink: 0 }}>
               <IconButton
                 icon={<Menu size={19} />}
                 label="Open navigation menu"
@@ -138,8 +138,8 @@ export const AdminShell: React.FC = () => {
             >
               <ShieldCheck size={20} />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {activeItem.label}
                 </h1>
@@ -154,7 +154,7 @@ export const AdminShell: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <IconButton
               icon={<RefreshCw size={16} />}
               label="Refresh live data"
