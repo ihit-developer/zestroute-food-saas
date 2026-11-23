@@ -139,7 +139,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
   }
 
   return (
-    <div className="zr-shell">
+    <div className={`zr-shell ${collapsed ? 'zr-shell-collapsed' : ''}`}>
       <Sidebar
         items={navItems}
         activeKey={activeKey}

@@ -291,7 +291,7 @@ export const AdminSidebar: React.FC<{
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, overflowY: 'auto' }}>
         {items.map((item) => {
           const active = item.key === activeKey;
           const showLabel = !collapsed || mobileOpen;
@@ -307,15 +307,15 @@ export const AdminSidebar: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: showLabel ? 'space-between' : 'center',
-                gap: 10,
-                padding: '10px 12px',
-                borderRadius: 10,
+                gap: 9,
+                padding: '7.5px 11px',
+                borderRadius: 9,
                 border: 'none',
                 cursor: 'pointer',
                 backgroundColor: active ? 'var(--zr-primary-soft)' : 'transparent',
                 color: active ? 'var(--zr-secondary)' : 'var(--zr-text)',
                 fontWeight: active ? 700 : 500,
-                fontSize: 13.5,
+                fontSize: 13,
               }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>

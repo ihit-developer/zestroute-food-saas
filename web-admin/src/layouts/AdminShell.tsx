@@ -113,7 +113,7 @@ export const AdminShell: React.FC = () => {
   };
 
   return (
-    <div className="zr-shell">
+    <div className={`zr-shell ${collapsed ? 'zr-shell-collapsed' : ''}`}>
       <AdminSidebar
         items={navItems}
         activeKey={activeItem.key}
