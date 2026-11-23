@@ -37,6 +37,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
   const location = useLocation();
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [myRestaurants, setMyRestaurants] = useState<Array<{ id: string; name: string; status: ApprovalStatus }>>([]);
   const { theme, locale, toggleTheme, toggleLocale, restaurantId, restaurantName, setRestaurantContext } =
     useRestaurantStore();
@@ -128,6 +129,8 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
         onSelect={(key) => navigate(key)}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
       <div className="zr-main">
@@ -206,6 +209,7 @@ export const DashboardShell: React.FC<{ title?: string; subtitle?: string }> = (
         <TopNav
           title={`${restaurantName || 'Pizza Box'} — ${title}`}
           subtitle={subtitle}
+          onOpenMobileMenu={() => setMobileMenuOpen(true)}
           actions={
             <>
               <SecondaryButton onClick={toggleLocale} leftIcon={<Globe size={16} />}>

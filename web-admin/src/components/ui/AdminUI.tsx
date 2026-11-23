@@ -256,43 +256,75 @@ export const AdminSidebar: React.FC<{
   onSelect: (k: string) => void;
   collapsed: boolean;
   onToggle: () => void;
-}> = ({ items, activeKey, onSelect, collapsed, onToggle }) => (
-  <aside className={`zr-sidebar ${collapsed ? 'collapsed' : ''}`}>
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: collapsed ? 'column' : 'row',
-        alignItems: 'center',
-        justifyContent: collapsed ? 'center' : 'space-between',
-        gap: 8,
-        paddingBottom: 14,
-        borderBottom: '1px solid var(--zr-border)',
-        marginBottom: 8,
-      }}
-    >
-      <ZestRouteLogo compact={collapsed} />
-      <IconButton icon={<Menu size={16} />} label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={onToggle} />
-    </div>
-    {items.map((item) => {
-      const active = item.key === activeKey;
-      return (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onSelect(item.key)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
-            padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            backgroundColor: active ? 'var(--zr-primary-soft)' : 'transparent',
-            color: active ? 'var(--zr-secondary)' : 'var(--zr-text)', fontWeight: active ? 600 : 500, fontSize: 13.5,
-          }}
-        >
-          {item.icon}
-          {!collapsed && <span>{item.label}</span>}
-        </button>
-      );
-    })}
-  </aside>
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
+}> = ({ items, activeKey, onSelect, collapsed, onToggle, mobileOpen = false, onCloseMobile }) => (
+  <>
+    {mobileOpen && (
+      <div
+        className="zr-sidebar-backdrop"
+        onClick={onCloseMobile}
+        aria-hidden="true"
+      />
+    )}
+    <aside className={`zr-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: collapsed && !mobileOpen ? 'column' : 'row',
+          alignItems: 'center',
+          justifyContent: collapsed && !mobileOpen ? 'center' : 'space-between',
+          gap: 8,
+          paddingBottom: 14,
+          borderBottom: '1px solid var(--zr-border)',
+          marginBottom: 8,
+        }}
+      >
+        <ZestRouteLogo compact={collapsed && !mobileOpen} />
+        <div className="zr-desktop-only">
+          <IconButton icon={<Menu size={16} />} label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={onToggle} />
+        </div>
+        {onCloseMobile && (
+          <div className="zr-mobile-only">
+            <IconButton icon={<X size={16} />} label="Close menu" onClick={onCloseMobile} />
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, overflowY: 'auto' }}>
+        {items.map((item) => {
+          const active = item.key === activeKey;
+          const showLabel = !collapsed || mobileOpen;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                onSelect(item.key);
+                onCloseMobile?.();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: showLabel ? 'flex-start' : 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: active ? 'var(--zr-primary-soft)' : 'transparent',
+                color: active ? 'var(--zr-secondary)' : 'var(--zr-text)',
+                fontWeight: active ? 700 : 500,
+                fontSize: 13.5,
+              }}
+            >
+              {item.icon}
+              {showLabel && <span>{item.label}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  </>
 );
 
 const ToastContext = createContext<{ showToast: (msg: string) => void } | null>(null);

@@ -13,6 +13,7 @@ import {
   Image,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquareWarning,
   Moon,
   Percent,
@@ -37,6 +38,7 @@ export const AdminShell: React.FC = () => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, locale, toggleTheme, toggleLocale } = useAdminStore();
   const hasToken = Boolean(adminTokenStorage.getAccessToken());
 
@@ -104,12 +106,21 @@ export const AdminShell: React.FC = () => {
         onSelect={(k) => navigate(k)}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
       <div className="zr-main">
         <AdminLiveOrderPopup />
         <header className="zr-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <div className="zr-mobile-only">
+              <IconButton
+                icon={<Menu size={19} />}
+                label="Open navigation menu"
+                onClick={() => setMobileMenuOpen(true)}
+              />
+            </div>
             <div
               style={{
                 width: 38,
