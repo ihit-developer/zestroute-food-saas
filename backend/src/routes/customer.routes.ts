@@ -419,6 +419,20 @@ customerRouter.post('/support/tickets/:ticketId/messages', authenticate, async (
   }
 });
 
+customerRouter.post('/support/tickets/:ticketId/typing', authenticate, async (req, res, next) => {
+  try {
+    const roles = req.auth!.roles ?? [];
+    const data = await CustomerEngagementService.setSupportTyping(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      roles
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 customerRouter.post('/support/tickets/:ticketId/escalate', authenticate, async (req, res, next) => {
   try {
     const data = await CustomerEngagementService.escalateSupportTicket(

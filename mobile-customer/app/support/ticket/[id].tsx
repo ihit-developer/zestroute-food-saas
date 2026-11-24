@@ -48,6 +48,10 @@ interface SupportTicketDetail {
     targetType?: 'restaurant' | 'admin';
     restaurantName?: string;
     escalatedToAdmin?: boolean;
+    closedReason?: 'inactivity' | 'resolved' | 'manual';
+    activeAgentName?: string;
+    inactivityMinutesLeft?: number;
+    typing?: { role: string; name: string } | null;
     rating?: number;
     ratingFeedback?: string;
     orderSummary?: SupportOrderSummary;
@@ -79,11 +83,20 @@ export default function SupportChatScreen() {
   const [pickedStars, setPickedStars] = useState(5);
   const [ratingNote, setRatingNote] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
+  const lastTypingPingRef = useRef(0);
+
+  const notifyTyping = () => {
+    if (!id) return;
+    const now = Date.now();
+    if (now - lastTypingPingRef.current < 2500) return;
+    lastTypingPingRef.current = now;
+    void httpClient.post(`/support/tickets/${id}/typing`, {}).catch(() => {});
+  };
 
   const { data, isLoading, refetch } = useQuery<SupportTicketDetail>({
     queryKey: ['customer', 'support-ticket', id],
     enabled: Boolean(id),
-    refetchInterval: 3000,
+    refetchInterval: 2500,
     queryFn: () => httpClient.get<SupportTicketDetail>(`/support/tickets/${id}`),
   });
 
@@ -188,9 +201,13 @@ export default function SupportChatScreen() {
           <Headphones size={14} color="#2563EB" />
         )}
         <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
-          {isRestaurantChat
-            ? `${ticket?.restaurantName || 'Restaurant'} · Online`
-            : 'Dastarkhwan Admin · Online'}
+          {ticket?.typing
+            ? `${ticket.typing.name} is typing...`
+            : ticket?.activeAgentName
+              ? `Live Agent: ${ticket.activeAgentName} · Online`
+              : isRestaurantChat
+                ? `${ticket?.restaurantName || 'Restaurant'} · Live Agent`
+                : 'Dastarkhwan Live Agent · Online'}
         </Text>
 
         {isRestaurantChat && !ticket?.escalatedToAdmin ? (
@@ -213,6 +230,25 @@ export default function SupportChatScreen() {
           </View>
         ) : null}
       </View>
+
+      {/* Inactivity Auto-Close Warning or Closed Banner */}
+      {ticket && (ticket.status === 'open' || ticket.status === 'in_progress') && (ticket.inactivityMinutesLeft ?? 15) <= 5 ? (
+        <View style={styles.inactivityWarn}>
+          <AlertTriangle size={13} color="#B45309" />
+          <Text style={styles.inactivityWarnText}>
+            No recent activity — chat will auto-close in {Math.max(1, ticket.inactivityMinutesLeft ?? 1)} min
+          </Text>
+        </View>
+      ) : null}
+
+      {ticket?.status === 'closed' && ticket.closedReason === 'inactivity' ? (
+        <View style={styles.inactivityClosed}>
+          <AlertTriangle size={13} color="#DC2626" />
+          <Text style={styles.inactivityClosedText}>
+            Chat auto-closed due to inactivity. Send a message below anytime to reopen.
+          </Text>
+        </View>
+      ) : null}
 
       {/* Live Attached Order Card */}
       {ticket?.orderSummary ? (
@@ -339,6 +375,35 @@ export default function SupportChatScreen() {
             })
           )}
 
+          {/* Live Agent Typing Bubble */}
+          {ticket?.typing ? (
+            <View style={[styles.bubbleWrap, { alignItems: 'flex-start' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 3, marginHorizontal: 4 }}>
+                {ticket.typing.name}
+              </Text>
+              <View
+                style={[
+                  styles.bubble,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    borderRadius: radii.lg,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                  },
+                ]}
+              >
+                <View style={styles.typingDot} />
+                <View style={[styles.typingDot, { opacity: 0.65 }]} />
+                <View style={[styles.typingDot, { opacity: 0.35 }]} />
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary, marginLeft: 4 }}>
+                  typing...
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
           {/* 1–5 Star Post-Chat Support Rating Card */}
           {isResolved && ticket ? (
             <View
@@ -429,7 +494,10 @@ export default function SupportChatScreen() {
             }
             placeholderTextColor={colors.textSecondary}
             value={message}
-            onChangeText={setMessage}
+            onChangeText={(val) => {
+              setMessage(val);
+              if (val.trim()) notifyTyping();
+            }}
             multiline
             maxLength={1000}
           />
@@ -542,6 +610,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
+  },
+  inactivityWarn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: '#FEF3C7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FCD34D',
+  },
+  inactivityWarnText: { fontSize: 11.5, fontWeight: '700', color: '#92400E', flex: 1 },
+  inactivityClosed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#FEE2E2',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FCA5A5',
+  },
+  inactivityClosedText: { fontSize: 11.5, fontWeight: '700', color: '#991B1B', flex: 1 },
+  typingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: '#F47B20',
   },
   composer: {
     padding: 10,

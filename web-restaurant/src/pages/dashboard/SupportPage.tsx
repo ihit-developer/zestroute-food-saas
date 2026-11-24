@@ -47,6 +47,10 @@ interface SupportTicketRow {
   channel?: 'customer_chat' | 'admin_support';
   targetType?: 'restaurant' | 'admin';
   escalatedToAdmin?: boolean;
+  closedReason?: 'inactivity' | 'resolved' | 'manual';
+  activeAgentName?: string;
+  inactivityMinutesLeft?: number;
+  typing?: { role: string; name: string } | null;
   rating?: number;
   ratingFeedback?: string;
   userName?: string;
@@ -88,6 +92,15 @@ export const SupportPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  const lastTypingPingRef = useRef(0);
+
+  const notifyTyping = (ticketId: string | null) => {
+    if (!ticketId) return;
+    const now = Date.now();
+    if (now - lastTypingPingRef.current < 2500) return;
+    lastTypingPingRef.current = now;
+    void restaurantHttpClient.post(`/support/tickets/${ticketId}/typing`, {}).catch(() => {});
+  };
 
   // New Admin Ticket Modal
   const [newOpen, setNewOpen] = useState(false);
@@ -495,6 +508,24 @@ export const SupportPage: React.FC = () => {
                       </div>
                     );
                   })}
+                  {/* Inactivity Warning / Auto-Closed Banner */}
+                  {detail.ticket.status === 'closed' && detail.ticket.closedReason === 'inactivity' ? (
+                    <div style={{ padding: '8px 12px', borderRadius: 10, background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#991B1B', fontSize: 12, fontWeight: 700 }}>
+                      Chat auto-closed due to 15 min inactivity. Send a reply below anytime to reopen.
+                    </div>
+                  ) : (detail.ticket.status === 'open' || detail.ticket.status === 'in_progress') && (detail.ticket.inactivityMinutesLeft ?? 15) <= 5 ? (
+                    <div style={{ padding: '8px 12px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', fontSize: 12, fontWeight: 700 }}>
+                      Idle session — will auto-close in {Math.max(1, detail.ticket.inactivityMinutesLeft ?? 1)} min if no message is sent.
+                    </div>
+                  ) : null}
+
+                  {/* Live Typing Indicator */}
+                  {detail.ticket.typing ? (
+                    <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 12, background: 'var(--zr-surface-alt)', border: '1px solid var(--zr-border)', fontSize: 12, fontWeight: 700, color: 'var(--zr-primary)' }}>
+                      <span className="zr-typing-dots"><span /><span /><span /></span>
+                      <span>{detail.ticket.typing.name} is typing...</span>
+                    </div>
+                  ) : null}
                   <div ref={chatEndRef} />
                 </div>
 
@@ -559,7 +590,10 @@ export const SupportPage: React.FC = () => {
                           : 'Write a message to Dastarkhwan Admin...'
                       }
                       value={reply}
-                      onChange={(e) => setReply(e.target.value)}
+                      onChange={(e) => {
+                        setReply(e.target.value);
+                        if (e.target.value.trim()) notifyTyping(activeId);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

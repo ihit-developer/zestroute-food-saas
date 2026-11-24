@@ -468,6 +468,19 @@ adminRouter.get('/support/tickets/:ticketId', async (req, res, next) => {
   }
 });
 
+adminRouter.post('/support/tickets/:ticketId/typing', async (req, res, next) => {
+  try {
+    const data = await CustomerEngagementService.setSupportTyping(
+      String(req.params.ticketId),
+      req.auth!.userId,
+      ['super_admin']
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.post('/support/tickets/:ticketId/messages', async (req, res, next) => {
   try {
     const data = await CustomerEngagementService.postSupportMessage(

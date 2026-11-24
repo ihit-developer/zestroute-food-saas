@@ -39,6 +39,10 @@ interface AdminSupportTicket {
   targetType?: 'restaurant' | 'admin';
   restaurantName?: string;
   escalatedToAdmin?: boolean;
+  closedReason?: 'inactivity' | 'resolved' | 'manual';
+  activeAgentName?: string;
+  inactivityMinutesLeft?: number;
+  typing?: { role: string; name: string } | null;
   rating?: number;
   ratingFeedback?: string;
   orderSummary?: AdminOrderSummary;
@@ -81,6 +85,15 @@ export const ComplaintsPage: React.FC = () => {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastTypingPingRef = useRef(0);
+
+  const notifyAdminTyping = (ticketId: string | null) => {
+    if (!ticketId) return;
+    const now = Date.now();
+    if (now - lastTypingPingRef.current < 2500) return;
+    lastTypingPingRef.current = now;
+    void adminHttpClient.post(`/admin/support/tickets/${ticketId}/typing`, {}).catch(() => {});
+  };
 
   // Create Ticket Modal State
   const [createOpen, setCreateOpen] = useState(false);
@@ -509,6 +522,22 @@ export const ComplaintsPage: React.FC = () => {
                       </div>
                     );
                   })}
+                  {detail.ticket.status === 'closed' && detail.ticket.closedReason === 'inactivity' ? (
+                    <div style={{ padding: '8px 12px', borderRadius: 10, background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#991B1B', fontSize: 12, fontWeight: 700 }}>
+                      Chat auto-closed due to 15 min inactivity. Send a reply below anytime to reopen.
+                    </div>
+                  ) : (detail.ticket.status === 'open' || detail.ticket.status === 'in_progress') && (detail.ticket.inactivityMinutesLeft ?? 15) <= 5 ? (
+                    <div style={{ padding: '8px 12px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', fontSize: 12, fontWeight: 700 }}>
+                      Idle session — will auto-close in {Math.max(1, detail.ticket.inactivityMinutesLeft ?? 1)} min if inactive.
+                    </div>
+                  ) : null}
+
+                  {detail.ticket.typing ? (
+                    <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 12, background: 'var(--zr-surface-alt)', border: '1px solid var(--zr-border)', fontSize: 12, fontWeight: 700, color: '#F47B20' }}>
+                      <span className="zr-typing-dots"><span /><span /><span /></span>
+                      <span>{detail.ticket.typing.name} is typing...</span>
+                    </div>
+                  ) : null}
                   <div ref={chatEndRef} />
                 </div>
 
@@ -566,7 +595,10 @@ export const ComplaintsPage: React.FC = () => {
                     <InputField
                       placeholder="Type live reply to customer / restaurant..."
                       value={reply}
-                      onChange={(e) => setReply(e.target.value)}
+                      onChange={(e) => {
+                        setReply(e.target.value);
+                        if (e.target.value.trim()) notifyAdminTyping(activeId);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

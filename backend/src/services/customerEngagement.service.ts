@@ -280,6 +280,51 @@ export class CustomerEngagementService {
     return map;
   }
 
+  private static readonly INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+  private static async closeInactiveTicketsIfNeeded(ticketIds?: mongoose.Types.ObjectId[]) {
+    const cutoff = new Date(Date.now() - this.INACTIVITY_TIMEOUT_MS);
+    const filter: Record<string, unknown> = {
+      status: { $in: ['open', 'in_progress'] },
+      $or: [
+        { lastActivityAt: { $lt: cutoff } },
+        { lastActivityAt: { $exists: false }, updatedAt: { $lt: cutoff } },
+      ],
+    };
+    if (ticketIds && ticketIds.length > 0) {
+      filter._id = { $in: ticketIds };
+    }
+    const stale = await SupportTicketModel.find(filter)
+      .select('_id userId')
+      .limit(50)
+      .lean();
+    if (stale.length === 0) return;
+
+    const now = new Date();
+    const staleIds = stale.map((t) => t._id);
+    await SupportTicketModel.updateMany(
+      { _id: { $in: staleIds } },
+      {
+        $set: {
+          status: 'closed',
+          closedReason: 'inactivity',
+          closedAt: now,
+          typingExpiresAt: undefined,
+        },
+      }
+    );
+
+    await SupportMessageModel.insertMany(
+      stale.map((t) => ({
+        ticketId: t._id,
+        senderId: t.userId,
+        senderRole: 'system',
+        message:
+          'Chat automatically closed due to inactivity (no messages for 15 minutes). Send a new message anytime to reopen.',
+      }))
+    ).catch(() => {});
+  }
+
   private static async canRestaurantAccessTicket(
     actorId: string,
     ticketRestaurantId?: mongoose.Types.ObjectId | null
@@ -296,6 +341,7 @@ export class CustomerEngagementService {
     viewerRole: 'customer' | 'rider' | 'restaurant_owner' = 'customer',
     activeRestaurantId?: string
   ) {
+    await this.closeInactiveTicketsIfNeeded();
     let query: Record<string, unknown> = { userId };
     let ownedRestIds: mongoose.Types.ObjectId[] = [];
 
@@ -453,6 +499,7 @@ export class CustomerEngagementService {
       subject: input.subject.trim(),
       lastReadByCustomerAt: senderRole === 'customer' || senderRole === 'rider' ? now : undefined,
       lastReadByRestaurantAt: senderRole === 'restaurant_owner' ? now : undefined,
+      lastActivityAt: now,
     });
 
     await SupportMessageModel.create({
@@ -469,6 +516,7 @@ export class CustomerEngagementService {
     if (!mongoose.Types.ObjectId.isValid(ticketId)) {
       throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
     }
+    await this.closeInactiveTicketsIfNeeded([new mongoose.Types.ObjectId(ticketId)]);
     const ticket = await SupportTicketModel.findById(ticketId)
       .populate('userId', 'fullName email phone')
       .populate('restaurantId', 'name ownerId')
@@ -515,6 +563,23 @@ export class CustomerEngagementService {
     const restReadTime = (readPatch.lastReadByRestaurantAt ?? ticket.lastReadByRestaurantAt)?.getTime() ?? 0;
     const custReadTime = (readPatch.lastReadByCustomerAt ?? ticket.lastReadByCustomerAt)?.getTime() ?? 0;
 
+    const viewerRole = isAdmin
+      ? 'super_admin'
+      : isOwningRestaurant || (isRestaurantRole && ownerId === actorId)
+        ? 'restaurant_owner'
+        : 'customer';
+    const isTypingActive =
+      Boolean(ticket.typingExpiresAt) &&
+      new Date(ticket.typingExpiresAt!).getTime() > now.getTime() &&
+      ticket.typingRole !== viewerRole;
+
+    const lastActTime = new Date(ticket.lastActivityAt ?? ticket.updatedAt ?? ticket.createdAt).getTime();
+    const msLeft = Math.max(0, this.INACTIVITY_TIMEOUT_MS - (now.getTime() - lastActTime));
+    const inactivityMinutesLeft =
+      ticket.status === 'open' || ticket.status === 'in_progress'
+        ? Math.ceil(msLeft / 60_000)
+        : 0;
+
     return {
       ticket: {
         id: String(ticket._id),
@@ -528,6 +593,14 @@ export class CustomerEngagementService {
         restaurantName: restObj?.name ?? undefined,
         escalatedToAdmin: Boolean(ticket.escalatedToAdmin),
         escalatedAt: ticket.escalatedAt ? String(ticket.escalatedAt) : undefined,
+        closedReason: ticket.closedReason ?? undefined,
+        closedAt: ticket.closedAt ? String(ticket.closedAt) : undefined,
+        activeAgentName: ticket.activeAgentName ?? undefined,
+        lastActivityAt: new Date(lastActTime).toISOString(),
+        inactivityMinutesLeft,
+        typing: isTypingActive
+          ? { role: ticket.typingRole ?? 'agent', name: ticket.typingName ?? 'Support Agent' }
+          : null,
         rating: ticket.rating ?? undefined,
         ratingFeedback: ticket.ratingFeedback ?? undefined,
         userName: ownerObj?.fullName ?? 'User',
@@ -599,6 +672,25 @@ export class CustomerEngagementService {
       throw new AppError(403, 'FORBIDDEN', 'You do not have access to this support ticket');
     }
 
+    const now = new Date();
+    const wasAgentAssigned = Boolean(ticket.activeAgentName);
+
+    if (isAdmin || isOwningRestaurant) {
+      if (!wasAgentAssigned) {
+        const actorProfile = await ProfileModel.findById(actorId).select('fullName').lean();
+        const agentName = isAdmin
+          ? actorProfile?.fullName || 'Dastarkhwan Live Agent'
+          : actorProfile?.fullName || 'Restaurant Live Agent';
+        ticket.activeAgentName = agentName;
+        await SupportMessageModel.create({
+          ticketId: ticket._id,
+          senderId: actorId,
+          senderRole: 'system',
+          message: `Live Agent ${agentName} joined the conversation.`,
+        }).catch(() => {});
+      }
+    }
+
     const msg = await SupportMessageModel.create({
       ticketId: ticket._id,
       senderId: actorId,
@@ -606,16 +698,15 @@ export class CustomerEngagementService {
       message: trimmed,
     });
 
-    const now = new Date();
     if (isAdmin) {
       ticket.lastReadByAdminAt = now;
-      if (ticket.status === 'open') {
+      if (ticket.status === 'open' || ticket.status === 'closed') {
         ticket.status = 'in_progress';
         ticket.assignedAdminId = new mongoose.Types.ObjectId(actorId);
       }
     } else if (isOwningRestaurant) {
       ticket.lastReadByRestaurantAt = now;
-      if (ticket.status === 'open') {
+      if (ticket.status === 'open' || ticket.status === 'closed') {
         ticket.status = 'in_progress';
       }
     } else {
@@ -628,6 +719,10 @@ export class CustomerEngagementService {
         ticket.status = 'open';
       }
     }
+    ticket.lastActivityAt = now;
+    ticket.closedReason = undefined;
+    ticket.closedAt = undefined;
+    ticket.typingExpiresAt = undefined;
     ticket.updatedAt = now;
     await ticket.save();
 
@@ -650,6 +745,42 @@ export class CustomerEngagementService {
       isSeen: false,
       createdAt: String(msg.createdAt),
     };
+  }
+
+  static async setSupportTyping(ticketId: string, actorId: string, actorRoles: string[]) {
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      throw new AppError(400, 'INVALID_TICKET', 'Invalid ticket ID');
+    }
+    const ticket = await SupportTicketModel.findById(ticketId).select('_id userId restaurantId').lean();
+    if (!ticket) throw new AppError(404, 'TICKET_NOT_FOUND', 'Support ticket not found');
+
+    const isAdmin = actorRoles.includes('super_admin');
+    const isRestaurantRole = actorRoles.includes('restaurant_owner') || actorRoles.includes('restaurant_staff');
+    const isOwningRestaurant =
+      isRestaurantRole && (await this.canRestaurantAccessTicket(actorId, ticket.restaurantId));
+
+    if (!isAdmin && String(ticket.userId) !== actorId && !isOwningRestaurant) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have access to this support ticket');
+    }
+
+    const actorProfile = await ProfileModel.findById(actorId).select('fullName').lean();
+    const typingRole = isAdmin
+      ? 'super_admin'
+      : isOwningRestaurant || (isRestaurantRole && String(ticket.userId) === actorId)
+        ? 'restaurant_owner'
+        : 'customer';
+    const typingName = isAdmin
+      ? actorProfile?.fullName || 'Dastarkhwan Live Agent'
+      : typingRole === 'restaurant_owner'
+        ? actorProfile?.fullName || 'Restaurant Agent'
+        : actorProfile?.fullName || 'Customer';
+
+    const expiresAt = new Date(Date.now() + 5500);
+    await SupportTicketModel.updateOne(
+      { _id: ticket._id },
+      { $set: { typingRole, typingName, typingExpiresAt: expiresAt } }
+    );
+    return { typing: true, expiresAt: expiresAt.toISOString() };
   }
 
   static async escalateSupportTicket(ticketId: string, actorId: string) {
@@ -735,6 +866,7 @@ export class CustomerEngagementService {
   }
 
   static async listAllSupportTicketsForAdmin() {
+    await this.closeInactiveTicketsIfNeeded();
     const tickets = await SupportTicketModel.find()
       .populate('userId', 'fullName email phone')
       .populate('restaurantId', 'name')
